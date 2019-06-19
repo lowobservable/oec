@@ -125,6 +125,12 @@ class VT100Emulator:
 
     def _map_key(self, key, keyboard_modifiers):
         if keyboard_modifiers.is_alt():
+            # Ignore any modifiers... this would fall through and result in a warning
+            # if they are not explicitly ignored.
+            if key in [Key.LEFT_ALT, Key.RIGHT_ALT, Key.LEFT_SHIFT, Key.RIGHT_SHIFT,
+                       Key.CAPS_LOCK]:
+                return None
+
             bytes_ = VT100_KEY_MAP_ALT.get(key)
 
             if bytes_ is not None:
