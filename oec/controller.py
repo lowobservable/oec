@@ -143,6 +143,10 @@ class Controller:
 
         (key, modifiers, modifiers_changed) = self.terminal.keyboard.get_key(scan_code)
 
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug((f'Keystroke detected: Scan Code = {scan_code}, '
+                               f'Key = {key}, Modifiers = {modifiers}'))
+
         # Update the status line if modifiers have changed.
         if modifiers_changed:
             indicators = bytearray(1)
@@ -153,10 +157,6 @@ class Controller:
                 indicators[0] = 0x00
 
             self.terminal.status_line.write(35, indicators)
-
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug((f'Keystroke detected: Scan Code = {scan_code}, '
-                               f'Key = {key}, Modifiers = {modifiers}'))
 
         if not key:
             return

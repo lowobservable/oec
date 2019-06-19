@@ -7,7 +7,8 @@ from collections import namedtuple
 
 from .display import StatusLine
 from .keyboard import Keyboard
-from .keymap_3278_2 import KEYMAP
+from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from .keymap_3483 import KEYMAP as KEYMAP_3483
 
 # Does not include the status line row.
 Dimensions = namedtuple('Dimensions', ['rows', 'columns'])
@@ -28,7 +29,12 @@ def get_dimensions(terminal_id, extended_id):
 
 def get_keyboard(terminal_id, extended_id):
     """Get keyboard configured with terminal keymap."""
-    return Keyboard(KEYMAP)
+    keymap = KEYMAP_3278_2
+
+    if extended_id == 'c1348300':
+        keymap = KEYMAP_3483
+
+    return Keyboard(keymap)
 
 class Terminal:
     """Terminal information, devices and helpers."""

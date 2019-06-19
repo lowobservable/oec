@@ -4,7 +4,7 @@ oec.keyboard
 """
 
 from enum import IntEnum, IntFlag, unique, auto
-from collections import namedtuple
+from collections import namedtuple, Mapping
 
 class KeyboardModifiers(IntFlag):
     """Keyboard modifiers."""
@@ -295,12 +295,24 @@ class Keyboard:
 
         self.modifiers = KeyboardModifiers.NONE
 
+        self.single_modifier_release = True
+
+        if isinstance(self.keymap.modifier_release, Mapping):
+            self.single_modifier_release = False
+
+        self.modifier_release = False
+
     def get_key(self, scan_code):
         """Map a scan code to key and update modifiers state."""
         key = self.keymap.default.get(scan_code)
 
-        if self._apply_modifiers(scan_code, key):
-            return (key, self.modifiers, True)
+        original_modifiers = self.modifiers
+
+        (is_modifier, is_modifier_release) = self._apply_modifiers(scan_code, key)
+
+        if is_modifier:
+            return (key if not is_modifier_release else None, self.modifiers,
+                    self.modifiers != original_modifiers)
 
         if self.modifiers.is_shift():
             key = self.keymap.shift.get(scan_code)
@@ -319,21 +331,35 @@ class Keyboard:
         return (key, self.modifiers, False)
 
     def _apply_modifiers(self, scan_code, key):
-        if scan_code in self.keymap.modifier_release:
-            released_key = self.keymap.modifier_release[scan_code]
+        # TODO: Consider detection, in single modifier release mode, of entering
+        # modififier release but the next keystroke not being a modifier... also
+        # consider a warning in the case where a release of an unset modifier or
+        # the setting of an already set modifier occurs.
+        if self.single_modifier_release and scan_code == self.keymap.modifier_release:
+            self.modifier_release = True
+
+            return (True, None)
+
+        if (self.single_modifier_release and self.modifier_release) or (not self.single_modifier_release and scan_code in self.keymap.modifier_release):
+            self.modifier_release = False
+
+            if self.single_modifier_release:
+                released_key = key
+            else:
+                released_key = self.keymap.modifier_release[scan_code]
 
             modifier = KEY_MODIFIER_MAP.get(released_key)
 
             if modifier is None:
-                return False
+                return (False, None)
 
             # Ignore the release of the caps lock key as it acts as a toggle.
             if modifier.is_caps_lock():
-                return False
+                return (True, True)
 
             self.modifiers &= ~modifier
 
-            return True
+            return (True, True)
 
         if key in KEY_MODIFIER_MAP:
             modifier = KEY_MODIFIER_MAP[key]
@@ -343,9 +369,9 @@ class Keyboard:
             else:
                 self.modifiers |= modifier
 
-            return True
+            return (True, False)
 
-        return False
+        return (False, None)
 
 def get_ascii_character_for_key(key):
     """Map a key to ASCII character."""
