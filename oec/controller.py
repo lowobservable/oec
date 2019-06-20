@@ -110,12 +110,21 @@ class Controller:
         except ProtocolError as error:
             self.logger.warning(f'READ_TERMINAL_ID protocol error: {error}', exc_info=error)
 
-        try:
-            extended_id = read_extended_id(self.interface)
-        except ReceiveError as error:
-            self.logger.warning(f'READ_EXTENDED_ID receive error: {error}', exc_info=error)
-        except ProtocolError as error:
-            self.logger.warning(f'READ_EXTENDED_ID protocol error: {error}', exc_info=error)
+        # Retry the READ_EXTENDED_ID command as it appears to fail frequently on the
+        # first request - unlike the READ_TERMINAL_ID command,
+        extended_id = None
+
+        for attempt in range(3):
+            try:
+                extended_id = read_extended_id(self.interface)
+
+                break
+            except ReceiveError as error:
+                self.logger.warning(f'READ_EXTENDED_ID receive error: {error}', exc_info=error)
+            except ProtocolError as error:
+                self.logger.warning(f'READ_EXTENDED_ID protocol error: {error}', exc_info=error)
+
+            time.sleep(0.25)
 
         return (terminal_id, extended_id.hex() if extended_id is not None else None)
 
