@@ -3,10 +3,10 @@ oec.keyboard
 ~~~~~~~~~~~~
 """
 
-from enum import IntEnum, IntFlag, unique, auto
+from enum import Enum, Flag, auto
 from collections import namedtuple, Mapping
 
-class KeyboardModifiers(IntFlag):
+class KeyboardModifiers(Flag):
     """Keyboard modifiers."""
     LEFT_SHIFT = auto()
     RIGHT_SHIFT = auto()
@@ -30,8 +30,7 @@ class KeyboardModifiers(IntFlag):
         """Is CAPS LOCK toggled on?"""
         return bool(self & KeyboardModifiers.CAPS_LOCK)
 
-@unique
-class Key(IntEnum):
+class Key(Enum):
     """Keyboad key."""
 
     # Modifiers
@@ -127,20 +126,20 @@ class Key(IntEnum):
     NUMPAD_BLANK_2 = 321
     NUMPAD_BLANK_3 = 322
     NUMPAD_BLANK_4 = 323
-    NUMPAD_SEVEN = 324
-    NUMPAD_EIGHT = 325
-    NUMPAD_NINE = 326
+    NUMPAD_SEVEN = ord('7')
+    NUMPAD_EIGHT = ord('8')
+    NUMPAD_NINE = ord('9')
     NUMPAD_FIELD_MINUS = 327
-    NUMPAD_FOUR = 328
-    NUMPAD_FIVE = 329
-    NUMPAD_SIX = 330
+    NUMPAD_FOUR = ord('4')
+    NUMPAD_FIVE = ord('5')
+    NUMPAD_SIX = ord('6')
     NUMPAD_BLANK_5 = 331
-    NUMPAD_ONE = 332
-    NUMPAD_TWO = 333
-    NUMPAD_THREE = 334
+    NUMPAD_ONE = ord('1')
+    NUMPAD_TWO = ord('2')
+    NUMPAD_THREE = ord('3')
     NUMPAD_FIELD_PLUS = 335
-    NUMPAD_ZERO = 336
-    NUMPAD_PERIOD = 337
+    NUMPAD_ZERO = ord('0')
+    NUMPAD_PERIOD = ord('.')
 
     # Latin
     BACKTICK = ord('`')
@@ -378,7 +377,7 @@ def get_ascii_character_for_key(key):
     if not key:
         return None
 
-    value = int(key)
+    value = key.value
 
     if value > 255:
         return None
