@@ -107,14 +107,14 @@ class VT100Session(Session):
 
     def handle_host(self):
         try:
-            if self.host_process in select([self.host_process], [], [], 0)[0]:
-                data = self.host_process.read()
+            if self.host_process not in select([self.host_process], [], [], 0)[0]:
+                return False
 
-                self._handle_host_output(data)
+            data = self.host_process.read()
 
-                return True
+            self._handle_host_output(data)
 
-            return False
+            return True
         except EOFError:
             self.host_process = None
 
