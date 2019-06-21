@@ -5,11 +5,10 @@ oec.controller
 
 import time
 import logging
-from coax import poll, poll_ack, read_terminal_id, read_extended_id, \
-                 KeystrokePollResponse, ReceiveTimeout, ReceiveError, \
-                 ProtocolError
+from coax import poll, poll_ack, KeystrokePollResponse, ReceiveTimeout, \
+                 ReceiveError, ProtocolError
 
-from .terminal import Terminal
+from .terminal import Terminal, read_terminal_ids
 from .session import SessionDisconnectedError
 from .vt100 import VT100Session
 
@@ -70,7 +69,7 @@ class Controller:
         self.logger.info('Terminal attached')
 
         # Read the terminal identifiers.
-        (terminal_id, extended_id) = self._read_terminal_ids()
+        (terminal_id, extended_id) = read_terminal_ids(self.interface)
 
         self.logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
 
@@ -92,35 +91,6 @@ class Controller:
 
         self.session.start()
 
-    def _read_terminal_ids(self):
-        terminal_id = None
-        extended_id = None
-
-        try:
-            terminal_id = read_terminal_id(self.interface)
-        except ReceiveError as error:
-            self.logger.warning(f'READ_TERMINAL_ID receive error: {error}', exc_info=error)
-        except ProtocolError as error:
-            self.logger.warning(f'READ_TERMINAL_ID protocol error: {error}', exc_info=error)
-
-        # Retry the READ_EXTENDED_ID command as it appears to fail frequently on the
-        # first request - unlike the READ_TERMINAL_ID command,
-        extended_id = None
-
-        for attempt in range(3):
-            try:
-                extended_id = read_extended_id(self.interface)
-
-                break
-            except ReceiveError as error:
-                self.logger.warning(f'READ_EXTENDED_ID receive error: {error}', exc_info=error)
-            except ProtocolError as error:
-                self.logger.warning(f'READ_EXTENDED_ID protocol error: {error}', exc_info=error)
-
-            time.sleep(0.25)
-
-        return (terminal_id, extended_id.hex() if extended_id is not None else None)
-
     def _handle_terminal_detached(self):
         self.logger.info('Terminal detached')
 
@@ -128,6 +98,11 @@ class Controller:
             self.session.terminate()
 
         self.terminal = None
+        self.session = None
+
+    def _handle_session_disconnected(self):
+        self.logger.info('Session disconnected')
+
         self.session = None
 
     def _handle_poll_response(self, poll_response):
@@ -159,8 +134,3 @@ class Controller:
 
         if self.session:
             self.session.handle_key(key, modifiers, scan_code)
-
-    def _handle_session_disconnected(self):
-        self.logger.info('Session disconnected')
-
-        self.session = None
