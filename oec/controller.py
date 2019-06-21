@@ -4,16 +4,14 @@ oec.controller
 """
 
 import time
-import os
-from select import select
 import logging
-from ptyprocess import PtyProcess
 from coax import poll, poll_ack, read_terminal_id, read_extended_id, \
                  KeystrokePollResponse, ReceiveTimeout, ReceiveError, \
                  ProtocolError
 
 from .terminal import Terminal
-from .emulator import VT100Emulator
+from .session import SessionDisconnectedError
+from .vt100 import VT100Session
 
 class Controller:
     """The controller."""
@@ -27,20 +25,16 @@ class Controller:
         self.host_command = host_command
 
         self.terminal = None
-        self.host_process = None
-        self.emulator = None
+        self.session = None
 
     def run(self):
         """Run the controller."""
         while self.running:
-            if self.host_process:
+            if self.session:
                 try:
-                    if self.host_process in select([self.host_process], [], [], 0)[0]:
-                        data = self.host_process.read()
-
-                        self._handle_host_process_output(data)
-                except EOFError:
-                    self._handle_host_process_terminated()
+                    self.session.handle_host()
+                except SessionDisconnectedError:
+                    self._handle_session_disconnected()
 
             try:
                 poll_response = poll(self.interface, timeout=1)
@@ -93,11 +87,10 @@ class Controller:
         # Show the attached indicator on the status line.
         self.terminal.display.status_line.write_string(0, 'S')
 
-        # Start the process.
-        self.host_process = self._start_host_process()
+        # Start the session.
+        self.session = VT100Session(self.terminal, self.host_command)
 
-        # Initialize the emulator.
-        self.emulator = VT100Emulator(self.terminal, self.host_process)
+        self.session.start()
 
     def _read_terminal_ids(self):
         terminal_id = None
@@ -131,17 +124,11 @@ class Controller:
     def _handle_terminal_detached(self):
         self.logger.info('Terminal detached')
 
-        if self.host_process:
-            self.logger.debug('Terminating host process')
-
-            if not self.host_process.terminate(force=True):
-                self.logger.error('Unable to terminate host process')
-            else:
-                self.logger.debug('Host process terminated')
+        if self.session:
+            self.session.terminate()
 
         self.terminal = None
-        self.host_process = None
-        self.emulator = None
+        self.session = None
 
     def _handle_poll_response(self, poll_response):
         if isinstance(poll_response, KeystrokePollResponse):
@@ -170,32 +157,10 @@ class Controller:
         if not key:
             return
 
-        if self.emulator:
-            self.emulator.handle_key(key, modifiers, scan_code)
+        if self.session:
+            self.session.handle_key(key, modifiers, scan_code)
 
-    def _start_host_process(self):
-        environment = os.environ.copy()
+    def _handle_session_disconnected(self):
+        self.logger.info('Session disconnected')
 
-        environment['TERM'] = 'vt100'
-        environment['LC_ALL'] = 'C'
-
-        process = PtyProcess.spawn(self.host_command, env=environment,
-                                   dimensions=self.terminal.display.dimensions)
-
-        return process
-
-    def _handle_host_process_output(self, data):
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug(f'Output from host process: {data}')
-
-        if self.emulator:
-            self.emulator.handle_host_output(data)
-
-    def _handle_host_process_terminated(self):
-        self.logger.info('Host process terminated')
-
-        if self.host_process.isalive():
-            self.logger.error('Host process is reporting as alive')
-
-        self.host_process = None
-        self.emulator = None
+        self.session = None

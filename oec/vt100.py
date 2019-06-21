@@ -1,11 +1,15 @@
 """
-oec.emulator
-~~~~~~~~~~~~
+oec.vt100
+~~~~~~~~~
 """
 
+import os
+from select import select
 import logging
+from ptyprocess import PtyProcess
 import pyte
 
+from .session import Session, SessionDisconnectedError
 from .display import encode_ascii_character
 from .keyboard import Key, get_ascii_character_for_key
 
@@ -65,14 +69,15 @@ VT100_KEY_MAP_ALT = {
     Key.NEWLINE: b'\n'
 }
 
-class VT100Emulator:
-    """VT100 emulator."""
+class VT100Session(Session):
+    """VT100 session."""
 
-    def __init__(self, terminal, host):
+    def __init__(self, terminal, host_command):
         self.logger = logging.getLogger(__name__)
 
         self.terminal = terminal
-        self.host = host
+        self.host_command = host_command
+        self.host_process = None
 
         # Initialize the VT100 screen.
         (rows, columns) = self.terminal.display.dimensions
@@ -83,6 +88,10 @@ class VT100Emulator:
 
         self.vt100_stream = pyte.ByteStream(self.vt100_screen)
 
+    def start(self):
+        # Start the host process.
+        self._start_host_process()
+
         # Clear the screen.
         self.terminal.display.clear_screen()
 
@@ -92,28 +101,30 @@ class VT100Emulator:
         # Load the address counter.
         self.terminal.display.load_address_counter(index=0)
 
+    def terminate(self):
+        if self.host_process:
+            self._terminate_host_process()
+
+    def handle_host(self):
+        try:
+            if self.host_process in select([self.host_process], [], [], 0)[0]:
+                data = self.host_process.read()
+
+                self._handle_host_output(data)
+
+                return True
+
+            return False
+        except EOFError:
+            self.host_process = None
+
+            raise SessionDisconnectedError
+
     def handle_key(self, key, keyboard_modifiers, scan_code):
-        """Handle a terminal keystroke."""
         bytes_ = self._map_key(key, keyboard_modifiers)
 
         if bytes_ is not None:
-            self.host.write(bytes_)
-
-    def handle_host_output(self, data):
-        """Handle output from the host process."""
-        self.vt100_stream.feed(data)
-
-        self.update()
-
-    def update(self):
-        """Update the terminal with dirty changes from the VT100 screen - clears
-        dirty lines after updating terminal.
-        """
-        self._apply(self.vt100_screen)
-
-        self.vt100_screen.dirty.clear()
-
-        self._flush()
+            self.host_process.write(bytes_)
 
     def _map_key(self, key, keyboard_modifiers):
         if keyboard_modifiers.is_alt():
@@ -141,6 +152,37 @@ class VT100Emulator:
                 return character.encode()
 
         return None
+
+    def _start_host_process(self):
+        environment = os.environ.copy()
+
+        environment['TERM'] = 'vt100'
+        environment['LC_ALL'] = 'C'
+
+        self.host_process = PtyProcess.spawn(self.host_command, env=environment,
+                                             dimensions=self.terminal.display.dimensions)
+
+    def _terminate_host_process(self):
+        self.logger.debug('Terminating host process')
+
+        if not self.host_process.terminate(force=True):
+            self.logger.error('Unable to terminate host process')
+        else:
+            self.logger.debug('Host process terminated')
+
+        self.host_process = None
+
+    def _handle_host_output(self, data):
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(f'Host process output: {data}')
+
+        self.vt100_stream.feed(data)
+
+        self._apply(self.vt100_screen)
+
+        self.vt100_screen.dirty.clear()
+
+        self._flush()
 
     def _apply(self, screen):
         for row in screen.dirty:
