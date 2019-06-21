@@ -5,7 +5,6 @@ oec.emulator
 
 import logging
 import pyte
-from coax import write_data
 
 from .display import encode_ascii_character
 from .keyboard import Key, get_ascii_character_for_key
@@ -75,30 +74,23 @@ class VT100Emulator:
         self.terminal = terminal
         self.host = host
 
-        self.rows = self.terminal.dimensions.rows
-        self.columns = self.terminal.dimensions.columns
+        # Initialize the VT100 screen.
+        (rows, columns) = self.terminal.display.dimensions
 
-        self.vt100_screen = pyte.Screen(self.columns, self.rows)
+        self.vt100_screen = pyte.Screen(columns, rows)
 
         self.vt100_screen.write_process_input = lambda data: host.write(data.encode())
 
         self.vt100_stream = pyte.ByteStream(self.vt100_screen)
 
-        # TODO: Consider moving the following three attributes to the Terminal class
-        # and moving the associated methods.
-        self.buffer = bytearray(self.rows * self.columns)
-        self.dirty = [False for index in range(self.rows * self.columns)]
-
-        self.address_counter = self._calculate_address(0)
-
         # Clear the screen.
-        self.terminal.clear_screen()
+        self.terminal.display.clear_screen()
 
         # Update the status line.
-        self.terminal.status_line.write_string(45, 'VT100')
+        self.terminal.display.status_line.write_string(45, 'VT100')
 
         # Load the address counter.
-        self.terminal.interface.offload_load_address_counter(self.address_counter)
+        self.terminal.display.load_address_counter(index=0)
 
     def handle_key(self, key, keyboard_modifiers, scan_code):
         """Handle a terminal keystroke."""
@@ -150,107 +142,38 @@ class VT100Emulator:
 
         return None
 
-    def _get_index(self, row, column):
-        return (row * self.columns) + column
-
-    def _calculate_address(self, cursor_index):
-        return self.columns + cursor_index
-
     def _apply(self, screen):
         for row in screen.dirty:
             row_buffer = screen.buffer[row]
 
-            for column in range(self.columns):
+            for column in range(self.terminal.display.dimensions.columns):
                 character = row_buffer[column]
 
                 # TODO: Investigate multi-byte or zero-byte cases further.
                 # TODO: Add additional mapping for special cases such as '^'...
                 byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
-                index = self._get_index(row, column)
-
-                if self.buffer[index] != byte:
-                    self.buffer[index] = byte
-                    self.dirty[index] = True
+                self.terminal.display.write_buffer(byte, row=row, column=column)
 
     def _flush(self):
-        for (start_index, end_index) in self._get_dirty_ranges():
-            self._flush_range(start_index, end_index)
+        display = self.terminal.display
+
+        display.flush()
 
         # Syncronize the cursor.
         cursor = self.vt100_screen.cursor
 
-        address = self._calculate_address(self._get_index(cursor.y, cursor.x))
+        address = display.calculate_address(row=cursor.y, column=cursor.x)
 
         # TODO: Investigate different approaches to reducing the need to syncronize the cursor
         # or make it more reliable.
-        if address != self.address_counter:
+        if address != display.address_counter:
             if self.logger.isEnabledFor(logging.DEBUG):
                 self.logger.debug((f'Setting address counter: Address = {address}, '
-                                   f'Address Counter = {self.address_counter}'))
+                                   f'Address Counter = {display.address_counter}'))
 
-            self.terminal.interface.offload_load_address_counter(address)
-
-            self.address_counter = address
+            display.load_address_counter(address)
         else:
             if self.logger.isEnabledFor(logging.DEBUG):
                 self.logger.debug((f'Skipping address counter: Address Counter = '
-                                   f'{self.address_counter}'))
-
-    def _get_dirty_ranges(self):
-        ranges = []
-
-        start_index = 0
-
-        while start_index < len(self.dirty):
-            if self.dirty[start_index]:
-                break
-
-            start_index += 1
-
-        end_index = len(self.dirty) - 1
-
-        while end_index >= 0:
-            if self.dirty[end_index]:
-                break
-
-            end_index -= 1
-
-        if start_index < len(self.dirty) and end_index >= 0:
-            ranges.append((start_index, end_index))
-
-        return ranges
-
-    def _flush_range(self, start_index, end_index):
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug(f'Flushing changes for range {start_index}-{end_index}')
-
-        data = self.buffer[start_index:end_index+1]
-
-        address = self._calculate_address(start_index)
-
-        # TODO: Consider using offload for all writing - set address to None if it is the
-        # same as the current address counter to avoid the additional load command.
-        if address != self.address_counter:
-            try:
-                self.terminal.interface.offload_write(data, address=address)
-            except Exception as error:
-                self.logger.error(f'Offload write error: {error}', exc_info=error)
-
-            self.address_counter = address + len(data)
-        else:
-            try:
-                write_data(self.terminal.interface, data)
-            except Exception as error:
-                self.logger.error(f'WRITE_DATA error: {error}', exc_info=error)
-
-            self.address_counter += len(data)
-
-        # Force the address counter to be updated...
-        if self.address_counter >= self._calculate_address((self.rows * self.columns) - 1):
-            self.address_counter = None
-
-        for index in range(start_index, end_index+1):
-            self.dirty[index] = False
-
-        return self.address_counter
+                                   f'{display.address_counter}'))

@@ -3,15 +3,10 @@ oec.terminal
 ~~~~~~~~~~~~
 """
 
-from collections import namedtuple
-
-from .display import StatusLine
+from .display import Dimensions, Display 
 from .keyboard import Keyboard
 from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from .keymap_3483 import KEYMAP as KEYMAP_3483
-
-# Does not include the status line row.
-Dimensions = namedtuple('Dimensions', ['rows', 'columns'])
 
 MODEL_DIMENSIONS = {
     2: Dimensions(24, 80),
@@ -27,14 +22,14 @@ def get_dimensions(terminal_id, extended_id):
 
     return MODEL_DIMENSIONS[terminal_id.model]
 
-def get_keyboard(terminal_id, extended_id):
-    """Get keyboard configured with terminal keymap."""
+def get_keymap(terminal_id, extended_id):
+    """Get terminal keymap."""
     keymap = KEYMAP_3278_2
 
     if extended_id == 'c1348300':
         keymap = KEYMAP_3483
 
-    return Keyboard(keymap)
+    return keymap
 
 class Terminal:
     """Terminal information, devices and helpers."""
@@ -44,15 +39,8 @@ class Terminal:
         self.terminal_id = terminal_id
         self.extended_id = extended_id
 
-        self.dimensions = get_dimensions(self.terminal_id, self.extended_id)
-        self.keyboard = get_keyboard(self.terminal_id, self.extended_id)
+        dimensions = get_dimensions(self.terminal_id, self.extended_id)
+        keymap = get_keymap(self.terminal_id, self.extended_id)
 
-        self.status_line = StatusLine(self.interface, self.dimensions.columns)
-
-    def clear_screen(self):
-        """Clear the screen - including the status line."""
-        (rows, columns) = self.dimensions
-
-        self.interface.offload_write(b'\x00', address=0, repeat=((rows+1)*columns)-1)
-
-        self.interface.offload_load_address_counter(columns)
+        self.display = Display(interface, dimensions)
+        self.keyboard = Keyboard(keymap)

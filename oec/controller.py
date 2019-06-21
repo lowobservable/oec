@@ -83,15 +83,15 @@ class Controller:
         # Initialize the terminal.
         self.terminal = Terminal(self.interface, terminal_id, extended_id)
 
-        (rows, columns) = self.terminal.dimensions
+        (rows, columns) = self.terminal.display.dimensions
         keymap_name = self.terminal.keyboard.keymap.name
 
         self.logger.info(f'Rows = {rows}, Columns = {columns}, Keymap = {keymap_name}')
 
-        self.terminal.clear_screen()
+        self.terminal.display.clear_screen()
 
         # Show the attached indicator on the status line.
-        self.terminal.status_line.write_string(0, 'S')
+        self.terminal.display.status_line.write_string(0, 'S')
 
         # Start the process.
         self.host_process = self._start_host_process()
@@ -165,7 +165,7 @@ class Controller:
             else:
                 indicators[0] = 0x00
 
-            self.terminal.status_line.write(35, indicators)
+            self.terminal.display.status_line.write(35, indicators)
 
         if not key:
             return
@@ -180,7 +180,7 @@ class Controller:
         environment['LC_ALL'] = 'C'
 
         process = PtyProcess.spawn(self.host_command, env=environment,
-                                   dimensions=self.terminal.dimensions)
+                                   dimensions=self.terminal.display.dimensions)
 
         return process
 
