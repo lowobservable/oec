@@ -179,11 +179,18 @@ class Display:
 
         self.address_counter = address
 
-    def clear_screen(self):
-        """Clear the screen - including the status line."""
+    def clear_screen(self, include_status_line=False):
+        """Clear the screen."""
         (rows, columns) = self.dimensions
 
-        self.interface.offload_write(b'\x00', address=0, repeat=((rows+1)*columns)-1)
+        if include_status_line:
+            address = 0
+            repeat = ((rows + 1) * columns) - 1
+        else:
+            address = columns
+            repeat = (rows * columns) - 1
+
+        self.interface.offload_write(b'\x00', address=address, repeat=repeat)
 
         # Update the buffer and dirty indicators to reflect the cleared screen.
         for index in range(rows * columns):
