@@ -1,5 +1,5 @@
 ptyprocess==0.6.0
-pycoax==0.1.0
+pycoax==0.1.1
 pyserial==3.4
 pyte==0.8.0
 sliplib==0.3.0
