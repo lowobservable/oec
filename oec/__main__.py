@@ -5,6 +5,7 @@ from serial import Serial
 from coax import Interface1
 
 from .controller import Controller
+from .vt100 import VT100Session
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,7 +33,11 @@ def main():
         print(f'Interface firmware version {firmware_version}')
 
         # Initialize and start the controller.
-        controller = Controller(interface, [args.command, *args.command_args])
+        host_command = [args.command, *args.command_args]
+
+        create_session = lambda terminal: VT100Session(terminal, host_command)
+
+        controller = Controller(interface, create_session)
 
         print('Starting controller...')
 

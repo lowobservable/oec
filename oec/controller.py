@@ -10,18 +10,17 @@ from coax import poll, poll_ack, KeystrokePollResponse, ReceiveTimeout, \
 
 from .terminal import Terminal, read_terminal_ids
 from .session import SessionDisconnectedError
-from .vt100 import VT100Session
 
 class Controller:
     """The controller."""
 
-    def __init__(self, interface, host_command):
+    def __init__(self, interface, create_session):
         self.logger = logging.getLogger(__name__)
 
         self.running = True
 
         self.interface = interface
-        self.host_command = host_command
+        self.create_session = create_session
 
         self.terminal = None
         self.session = None
@@ -87,9 +86,7 @@ class Controller:
         self.terminal.display.status_line.write_string(0, 'S')
 
         # Start the session.
-        self.session = VT100Session(self.terminal, self.host_command)
-
-        self.session.start()
+        self._start_session()
 
     def _handle_terminal_detached(self):
         self.logger.info('Terminal detached')
@@ -97,13 +94,22 @@ class Controller:
         if self.session:
             self.session.terminate()
 
+            self.session = None
+
         self.terminal = None
-        self.session = None
 
     def _handle_session_disconnected(self):
         self.logger.info('Session disconnected')
 
         self.session = None
+
+        # Restart the session.
+        self._start_session()
+
+    def _start_session(self):
+        self.session = self.create_session(self.terminal)
+
+        self.session.start()
 
     def _handle_poll_response(self, poll_response):
         if isinstance(poll_response, KeystrokePollResponse):
