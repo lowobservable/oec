@@ -185,7 +185,10 @@ class Display:
 
         self.interface.offload_write(b'\x00', address=0, repeat=((rows+1)*columns)-1)
 
-        # TODO: Update the buffer and dirty indicators to reflect the cleared screen.
+        # Update the buffer and dirty indicators to reflect the cleared screen.
+        for index in range(rows * columns):
+            self.buffer[index] = 0x00
+            self.dirty[index] = False
 
         self.load_address_counter(index=0)
 
