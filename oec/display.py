@@ -5,6 +5,7 @@ oec.display
 
 from collections import namedtuple
 import logging
+from sortedcontainers import SortedSet
 from coax import write_data
 
 _ASCII_CHAR_MAP = {
@@ -164,7 +165,7 @@ class Display:
         (rows, columns) = self.dimensions
 
         self.buffer = bytearray(rows * columns)
-        self.dirty = [False for index in range(rows * columns)]
+        self.dirty = SortedSet()
 
         self.address_counter = None
 
@@ -195,7 +196,8 @@ class Display:
         # Update the buffer and dirty indicators to reflect the cleared screen.
         for index in range(rows * columns):
             self.buffer[index] = 0x00
-            self.dirty[index] = False
+
+        self.dirty.clear()
 
         self.load_address_counter(index=0)
 
@@ -210,7 +212,8 @@ class Display:
             return False
 
         self.buffer[index] = byte
-        self.dirty[index] = True
+
+        self.dirty.add(index)
 
         return True
 
@@ -231,28 +234,11 @@ class Display:
         return (row * self.dimensions.columns) + column
 
     def _get_dirty_ranges(self):
-        ranges = []
+        if not self.dirty:
+            return []
 
-        start_index = 0
-
-        while start_index < len(self.dirty):
-            if self.dirty[start_index]:
-                break
-
-            start_index += 1
-
-        end_index = len(self.dirty) - 1
-
-        while end_index >= 0:
-            if self.dirty[end_index]:
-                break
-
-            end_index -= 1
-
-        if start_index < len(self.dirty) and end_index >= 0:
-            ranges.append((start_index, end_index))
-
-        return ranges
+        # TODO: Implement multiple ranges with optimization.
+        return [(self.dirty[0], self.dirty[-1])]
 
     def _flush_range(self, start_index, end_index):
         if self.logger.isEnabledFor(logging.DEBUG):
@@ -286,7 +272,7 @@ class Display:
             self.address_counter = None
 
         for index in range(start_index, end_index+1):
-            self.dirty[index] = False
+            self.dirty.discard(index)
 
         return self.address_counter
 

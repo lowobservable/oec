@@ -3,4 +3,5 @@ pycoax==0.1.1
 pyserial==3.4
 pyte==0.8.0
 sliplib==0.3.0
+sortedcontainers==2.1.0
 wcwidth==0.1.7
