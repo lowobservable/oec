@@ -126,14 +126,7 @@ class Controller:
 
         # Update the status line if modifiers have changed.
         if modifiers_changed:
-            indicators = bytearray(1)
-
-            if modifiers.is_shift():
-                indicators[0] = 0xda
-            else:
-                indicators[0] = 0x00
-
-            self.terminal.display.status_line.write(35, indicators)
+            self.terminal.display.status_line.write_keyboard_modifiers(modifiers)
 
         if not key:
             return

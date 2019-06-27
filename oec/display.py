@@ -301,3 +301,13 @@ class StatusLine:
 
     def write_string(self, column, string):
         self.write(column, encode_string(string))
+
+    def write_keyboard_modifiers(self, modifiers):
+        indicators = bytearray(1)
+
+        if modifiers.is_shift():
+            indicators[0] = 0xda
+        else:
+            indicators[0] = 0x00
+
+        self.write(35, indicators)
