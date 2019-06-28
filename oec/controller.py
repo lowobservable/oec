@@ -43,7 +43,7 @@ class Controller:
             last_poll_time = self._poll_delay(last_poll_time, last_poll_response)
 
             try:
-                poll_response = poll(self.interface, timeout=1)
+                poll_response = self._poll()
             except ReceiveTimeout:
                 if self.terminal:
                     self._handle_terminal_detached()
@@ -55,14 +55,6 @@ class Controller:
             except ProtocolError as error:
                 self.logger.warning(f'POLL protocol error: {error}', exc_info=error)
                 continue
-
-            if poll_response:
-                try:
-                    poll_ack(self.interface)
-                except ReceiveError as error:
-                    self.logger.warning(f'POLL_ACK receive error: {error}', exc_info=error)
-                except ProtocolError as error:
-                    self.logger.warning(f'POLL_ACK protocol error: {error}', exc_info=error)
 
             if not self.terminal:
                 self._handle_terminal_attached(poll_response)
@@ -141,6 +133,19 @@ class Controller:
 
         if self.session:
             self.session.handle_key(key, modifiers, scan_code)
+
+    def _poll(self):
+        poll_response = poll(self.interface, timeout=1)
+
+        if poll_response:
+            try:
+                poll_ack(self.interface)
+            except ReceiveError as error:
+                self.logger.warning(f'POLL_ACK receive error: {error}', exc_info=error)
+            except ProtocolError as error:
+                self.logger.warning(f'POLL_ACK protocol error: {error}', exc_info=error)
+
+        return poll_response
 
     def _poll_delay(self, last_poll_time, last_poll_response):
         if last_poll_response is None and last_poll_time is not None:
