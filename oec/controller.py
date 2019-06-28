@@ -25,14 +25,22 @@ class Controller:
         self.terminal = None
         self.session = None
 
+        self.connected_poll_period = 1 / 10
+        self.disconnected_poll_period = 5
+
     def run(self):
         """Run the controller."""
+        last_poll_time = None
+        last_poll_response = None
+
         while self.running:
             if self.session:
                 try:
                     self.session.handle_host()
                 except SessionDisconnectedError:
                     self._handle_session_disconnected()
+
+            last_poll_time = self._poll_delay(last_poll_time, last_poll_response)
 
             try:
                 poll_response = poll(self.interface, timeout=1)
@@ -61,8 +69,8 @@ class Controller:
 
             if poll_response:
                 self._handle_poll_response(poll_response)
-            else:
-                time.sleep(0.1)
+
+            last_poll_response = poll_response
 
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
@@ -133,3 +141,17 @@ class Controller:
 
         if self.session:
             self.session.handle_key(key, modifiers, scan_code)
+
+    def _poll_delay(self, last_poll_time, last_poll_response):
+        if last_poll_response is None and last_poll_time is not None:
+            if self.terminal:
+                period = self.connected_poll_period
+            else:
+                period = self.disconnected_poll_period
+
+            delay = (last_poll_time + period) - time.perf_counter()
+
+            if delay > 0:
+                time.sleep(delay)
+
+        return time.perf_counter()
