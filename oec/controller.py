@@ -17,7 +17,7 @@ class Controller:
     def __init__(self, interface, create_session):
         self.logger = logging.getLogger(__name__)
 
-        self.running = True
+        self.running = False
 
         self.interface = interface
         self.create_session = create_session
@@ -25,6 +25,12 @@ class Controller:
         self.terminal = None
         self.session = None
 
+        # Target time between POLL commands in seconds when a terminal is connected or
+        # no terminal is connected.
+        #
+        # The connected poll period only applies in cases where the terminal responded
+        # with TR/TA to the last poll - this is an effort to improve the keystroke
+        # responsiveness.
         self.connected_poll_period = 1 / 10
         self.disconnected_poll_period = 5
 
@@ -32,6 +38,8 @@ class Controller:
         """Run the controller."""
         last_poll_time = None
         last_poll_response = None
+
+        self.running = True
 
         while self.running:
             if self.session:
