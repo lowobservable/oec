@@ -84,7 +84,7 @@ class VT100Session(Session):
 
         self.vt100_screen = pyte.Screen(columns, rows)
 
-        self.vt100_screen.write_process_input = lambda data: host.write(data.encode())
+        self.vt100_screen.write_process_input = lambda data: self.host_process.write(data.encode())
 
         self.vt100_stream = pyte.ByteStream(self.vt100_screen)
 
