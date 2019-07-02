@@ -9,7 +9,7 @@ class EncodeAsciiCharacterTestCase(unittest.TestCase):
         self.assertEqual(encode_ascii_character(ord('a')), 0x80)
 
     def test_unmapped_character(self):
-        self.assertEqual(encode_ascii_character(ord('^')), 0x00)
+        self.assertEqual(encode_ascii_character(ord('`')), 0x00)
 
     def test_out_of_range(self):
         self.assertEqual(encode_ascii_character(ord('✓')), 0x00)

@@ -62,8 +62,8 @@ _ASCII_CHAR_MAP = {
     '¯': 0x37, # ???
     '°': 0x38,
     # 0x39 - Accent?
-    # 0x3a - Accent?
-    # 0x3b - A tilde?  It looks more like an accent...
+    '^': 0x3a, # More like an accent
+    '~': 0x3b, # More like an accent
     '¨': 0x3c,
     # 0x3d - Accute accent?
     # 0x3e - Opposite of accute accent?
