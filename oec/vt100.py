@@ -93,13 +93,13 @@ class VT100Session(Session):
         self._start_host_process()
 
         # Clear the screen.
-        self.terminal.display.clear_screen()
+        self.terminal.display.clear()
 
         # Update the status line.
         self.terminal.display.status_line.write_string(45, 'VT100')
 
-        # Load the address counter.
-        self.terminal.display.load_address_counter(index=0)
+        # Reset the cursor.
+        self.terminal.display.move_cursor(row=0, column=0)
 
     def terminate(self):
         if self.host_process:
@@ -198,24 +198,10 @@ class VT100Session(Session):
                 self.terminal.display.write_buffer(byte, row=row, column=column)
 
     def _flush(self):
-        display = self.terminal.display
+        self.terminal.display.flush()
 
-        display.flush()
-
-        # Syncronize the cursor.
+        # TODO: Investigate different approaches to making cursor syncronization more
+        # reliable - maybe it needs to be forced sometimes.
         cursor = self.vt100_screen.cursor
 
-        address = display.calculate_address(row=cursor.y, column=cursor.x)
-
-        # TODO: Investigate different approaches to reducing the need to syncronize the cursor
-        # or make it more reliable.
-        if address != display.address_counter:
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug((f'Setting address counter: Address = {address}, '
-                                   f'Address Counter = {display.address_counter}'))
-
-            display.load_address_counter(address)
-        else:
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug((f'Skipping address counter: Address Counter = '
-                                   f'{display.address_counter}'))
+        self.terminal.display.move_cursor(row=cursor.y, column=cursor.x)

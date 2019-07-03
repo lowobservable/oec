@@ -6,7 +6,6 @@ oec.display
 from collections import namedtuple
 import logging
 from sortedcontainers import SortedSet
-from coax import write_data
 
 _ASCII_CHAR_MAP = {
     '>': 0x08,
@@ -171,16 +170,46 @@ class Display:
 
         self.status_line = StatusLine(self.interface, columns)
 
-    def load_address_counter(self, address=None, index=None, row=None, column=None):
+    def move_cursor(self, address=None, index=None, row=None, column=None,
+                    force_load=False):
         """Load the address counter."""
         if address is None:
-            address = self.calculate_address(index=index, row=row, column=column)
+            address = self._calculate_address(index=index, row=row, column=column)
+
+        # TODO: Verify that the address is within range - exclude status line.
+
+        if address == self.address_counter and not force_load:
+            return False
 
         self.interface.offload_load_address_counter(address)
 
         self.address_counter = address
 
-    def clear_screen(self, include_status_line=False):
+        return True
+
+    def write_buffer(self, byte, index=None, row=None, column=None):
+        if index is None:
+            if row is not None and column is not None:
+                index = self._get_index(row, column)
+            else:
+                raise ValueError('Either index or row and column is required')
+
+        # TODO: Verify that index is within range.
+
+        if self.buffer[index] == byte:
+            return False
+
+        self.buffer[index] = byte
+
+        self.dirty.add(index)
+
+        return True
+
+    def flush(self):
+        for (start_index, end_index) in self._get_dirty_ranges():
+            self._flush_range(start_index, end_index)
+
+    def clear(self, include_status_line=False):
         """Clear the screen."""
         (rows, columns) = self.dimensions
 
@@ -199,29 +228,12 @@ class Display:
 
         self.dirty.clear()
 
-        self.load_address_counter(index=0)
+        self.move_cursor(index=0, force_load=True)
 
-    def write_buffer(self, byte, index=None, row=None, column=None):
-        if index is None:
-            if row is not None and column is not None:
-                index = self._get_index(row, column)
-            else:
-                raise ValueError('Either index or row and column is required')
+    def _get_index(self, row, column):
+        return (row * self.dimensions.columns) + column
 
-        if self.buffer[index] == byte:
-            return False
-
-        self.buffer[index] = byte
-
-        self.dirty.add(index)
-
-        return True
-
-    def flush(self):
-        for (start_index, end_index) in self._get_dirty_ranges():
-            self._flush_range(start_index, end_index)
-
-    def calculate_address(self, index=None, row=None, column=None):
+    def _calculate_address(self, index=None, row=None, column=None):
         if index is not None:
             return self.dimensions.columns + index
 
@@ -230,8 +242,16 @@ class Display:
 
         raise ValueError('Either index or row and column is required')
 
-    def _get_index(self, row, column):
-        return (row * self.dimensions.columns) + column
+    def _calculate_address_after_write(self, address, count):
+        address += count
+
+        (rows, columns) = self.dimensions
+
+        # TODO: Determine the correct behavior here...
+        if self.address_counter >= self._calculate_address((rows * columns) - 1):
+            return None
+
+        return address
 
     def _get_dirty_ranges(self):
         if not self.dirty:
@@ -246,32 +266,17 @@ class Display:
 
         data = self.buffer[start_index:end_index+1]
 
-        address = self.calculate_address(start_index)
+        address = self._calculate_address(start_index)
 
-        # TODO: Consider using offload for all writing - set address to None if it is the
-        # same as the current address counter to avoid the additional load command.
-        if address != self.address_counter:
-            try:
-                self.interface.offload_write(data, address=address)
-            except Exception as error:
-                self.logger.error(f'Offload write error: {error}', exc_info=error)
+        try:
+            self.interface.offload_write(data, address=address if address != self.address_counter else None)
+        except Exception as error:
+            # TODO: This could leave the address_counter incorrect.
+            self.logger.error(f'Offload write error: {error}', exc_info=error)
 
-            self.address_counter = address + len(data)
-        else:
-            try:
-                write_data(self.interface, data)
-            except Exception as error:
-                self.logger.error(f'WRITE_DATA error: {error}', exc_info=error)
+        self.address_counter = self._calculate_address_after_write(address, len(data))
 
-            self.address_counter += len(data)
-
-        # Force the address counter to be updated...
-        (rows, columns) = self.dimensions
-
-        if self.address_counter >= self.calculate_address((rows * columns) - 1):
-            self.address_counter = None
-
-        for index in range(start_index, end_index+1):
+        for index in range(start_index, end_index + 1):
             self.dirty.discard(index)
 
         return self.address_counter
