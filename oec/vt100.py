@@ -192,7 +192,6 @@ class VT100Session(Session):
                 character = row_buffer[column]
 
                 # TODO: Investigate multi-byte or zero-byte cases further.
-                # TODO: Add additional mapping for special cases such as '^'...
                 byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
                 self.terminal.display.buffered_write(byte, row, column)
