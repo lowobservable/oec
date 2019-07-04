@@ -99,7 +99,7 @@ class VT100Session(Session):
         self.terminal.display.status_line.write_string(45, 'VT100')
 
         # Reset the cursor.
-        self.terminal.display.move_cursor(row=0, column=0)
+        self.terminal.display.move_cursor(0, 0)
 
     def terminate(self):
         if self.host_process:
@@ -195,7 +195,7 @@ class VT100Session(Session):
                 # TODO: Add additional mapping for special cases such as '^'...
                 byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
-                self.terminal.display.write_buffer(byte, row=row, column=column)
+                self.terminal.display.buffered_write(byte, row, column)
 
     def _flush(self):
         self.terminal.display.flush()
@@ -204,4 +204,4 @@ class VT100Session(Session):
         # reliable - maybe it needs to be forced sometimes.
         cursor = self.vt100_screen.cursor
 
-        self.terminal.display.move_cursor(row=cursor.y, column=cursor.x)
+        self.terminal.display.move_cursor(cursor.y, cursor.x)

@@ -88,7 +88,7 @@ class Controller:
 
         self.logger.info(f'Rows = {rows}, Columns = {columns}, Keymap = {keymap_name}')
 
-        self.terminal.display.clear(include_status_line=True)
+        self.terminal.display.clear(clear_status_line=True)
 
         # Show the attached indicator on the status line.
         self.terminal.display.status_line.write_string(0, 'S')

@@ -170,11 +170,9 @@ class Display:
 
         self.status_line = StatusLine(self.interface, columns)
 
-    def move_cursor(self, address=None, index=None, row=None, column=None,
-                    force_load=False):
+    def move_cursor(self, row, column, force_load=False):
         """Load the address counter."""
-        if address is None:
-            address = self._calculate_address(index=index, row=row, column=column)
+        address = self._calculate_address(row=row, column=column)
 
         # TODO: Verify that the address is within range - exclude status line.
 
@@ -187,12 +185,8 @@ class Display:
 
         return True
 
-    def write_buffer(self, byte, index=None, row=None, column=None):
-        if index is None:
-            if row is not None and column is not None:
-                index = self._get_index(row, column)
-            else:
-                raise ValueError('Either index or row and column is required')
+    def buffered_write(self, byte, row, column):
+        index = self._get_index(row, column)
 
         # TODO: Verify that index is within range.
 
@@ -209,11 +203,11 @@ class Display:
         for (start_index, end_index) in self._get_dirty_ranges():
             self._flush_range(start_index, end_index)
 
-    def clear(self, include_status_line=False):
+    def clear(self, clear_status_line=False):
         """Clear the screen."""
         (rows, columns) = self.dimensions
 
-        if include_status_line:
+        if clear_status_line:
             address = 0
             repeat = ((rows + 1) * columns) - 1
         else:
@@ -228,7 +222,7 @@ class Display:
 
         self.dirty.clear()
 
-        self.move_cursor(index=0, force_load=True)
+        self.move_cursor(0, 0, force_load=True)
 
     def _get_index(self, row, column):
         return (row * self.dimensions.columns) + column
