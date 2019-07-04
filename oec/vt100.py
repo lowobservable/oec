@@ -11,7 +11,7 @@ import pyte
 
 from .session import Session, SessionDisconnectedError
 from .display import encode_ascii_character
-from .keyboard import Key, get_ascii_character_for_key
+from .keyboard import Key, get_ascii_character_for_key, MODIFIER_KEYS
 
 VT100_KEY_MAP = {
     Key.NOT: b'^',
@@ -130,8 +130,7 @@ class VT100Session(Session):
         if keyboard_modifiers.is_alt():
             # Ignore any modifiers... this would fall through and result in a warning
             # if they are not explicitly ignored.
-            if key in [Key.LEFT_ALT, Key.RIGHT_ALT, Key.LEFT_SHIFT, Key.RIGHT_SHIFT,
-                       Key.CAPS_LOCK]:
+            if key in MODIFIER_KEYS:
                 return None
 
             bytes_ = VT100_KEY_MAP_ALT.get(key)

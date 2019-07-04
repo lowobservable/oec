@@ -281,6 +281,8 @@ KEY_MODIFIER_MAP = {
     Key.CAPS_LOCK: KeyboardModifiers.CAPS_LOCK
 }
 
+MODIFIER_KEYS = set(KEY_MODIFIER_MAP.keys())
+
 Keymap = namedtuple('Keymap', ['name', 'default', 'shift', 'alt', 'modifier_release'])
 
 class Keyboard:
