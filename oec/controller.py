@@ -34,11 +34,11 @@ class Controller:
         self.connected_poll_period = 1 / 10
         self.disconnected_poll_period = 5
 
+        self.last_poll_time = None
+        self.last_poll_response = None
+
     def run(self):
         """Run the controller."""
-        last_poll_time = None
-        last_poll_response = None
-
         self.running = True
 
         while self.running:
@@ -47,8 +47,6 @@ class Controller:
                     self.session.handle_host()
                 except SessionDisconnectedError:
                     self._handle_session_disconnected()
-
-            last_poll_time = self._poll_delay(last_poll_time, last_poll_response)
 
             try:
                 poll_response = self._poll()
@@ -69,8 +67,6 @@ class Controller:
 
             if poll_response:
                 self._handle_poll_response(poll_response)
-
-            last_poll_response = poll_response
 
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
@@ -143,6 +139,13 @@ class Controller:
             self.session.handle_key(key, modifiers, scan_code)
 
     def _poll(self):
+        delay = self._calculate_poll_delay()
+
+        if delay > 0:
+            time.sleep(delay)
+
+        self.last_poll_time = time.perf_counter()
+
         poll_response = poll(self.interface, timeout=1)
 
         if poll_response:
@@ -153,18 +156,20 @@ class Controller:
             except ProtocolError as error:
                 self.logger.warning(f'POLL_ACK protocol error: {error}', exc_info=error)
 
+        self.last_poll_response = poll_response
+
         return poll_response
 
-    def _poll_delay(self, last_poll_time, last_poll_response):
-        if last_poll_response is None and last_poll_time is not None:
-            if self.terminal:
-                period = self.connected_poll_period
-            else:
-                period = self.disconnected_poll_period
+    def _calculate_poll_delay(self):
+        if self.last_poll_response is not None:
+            return 0
 
-            delay = (last_poll_time + period) - time.perf_counter()
+        if self.last_poll_time is None:
+            return 0
 
-            if delay > 0:
-                time.sleep(delay)
+        if self.terminal:
+            period = self.connected_poll_period
+        else:
+            period = self.disconnected_poll_period
 
-        return time.perf_counter()
+        return (self.last_poll_time + period) - time.perf_counter()
