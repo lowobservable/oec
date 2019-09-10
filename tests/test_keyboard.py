@@ -2,7 +2,7 @@ import unittest
 
 import context
 
-from oec.keyboard import KeyboardModifiers, Key, Keymap, Keyboard, get_ascii_character_for_key
+from oec.keyboard import KeyboardModifiers, Key, Keymap, Keyboard, get_ascii_character_for_key, get_ebcdic_character_for_key
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from oec.keymap_3483 import KEYMAP as KEYMAP_3483
 
@@ -209,3 +209,13 @@ class GetAsciiCharacterForKeyTestCase(unittest.TestCase):
 
     def test_mapping(self):
         self.assertEqual(get_ascii_character_for_key(Key.UPPER_A), 'A')
+
+class GetEbcdicCharacterForKeyTestCase(unittest.TestCase):
+    def test_none(self):
+        self.assertIsNone(get_ebcdic_character_for_key(None))
+
+    def test_no_mapping(self):
+        self.assertIsNone(get_ebcdic_character_for_key(Key.ATTN))
+
+    def test_mapping(self):
+        self.assertEqual(get_ebcdic_character_for_key(Key.UPPER_A), 193)

@@ -137,7 +137,11 @@ _ASCII_CHAR_MAP = {
     '*': 0xbf
 }
 
+_EBCDIC_CHAR_MAP = {ascii_character.encode('cp500')[0]: byte for ascii_character, byte in _ASCII_CHAR_MAP.items()}
+
 ASCII_CHAR_MAP = [_ASCII_CHAR_MAP.get(character, 0x00) for character in map(chr, range(256))]
+
+EBCDIC_CHAR_MAP = [_EBCDIC_CHAR_MAP.get(character, 0x00) for character in range(256)]
 
 def encode_ascii_character(character):
     """Map an ASCII character to a terminal display character."""
@@ -145,6 +149,13 @@ def encode_ascii_character(character):
         return 0x00
 
     return ASCII_CHAR_MAP[character]
+
+def encode_ebcdic_character(character):
+    """Map an EBCDIC character to a terminal display character."""
+    if character > 255:
+        return 0x00
+
+    return EBCDIC_CHAR_MAP[character]
 
 def encode_string(string, errors='replace'):
     """Map a string to terminal display characters."""
@@ -170,9 +181,9 @@ class Display:
 
         self.status_line = StatusLine(self.interface, columns)
 
-    def move_cursor(self, row, column, force_load=False):
+    def move_cursor(self, index=None, row=None, column=None, force_load=False):
         """Load the address counter."""
-        address = self._calculate_address(row=row, column=column)
+        address = self._calculate_address(index=index, row=row, column=column)
 
         # TODO: Verify that the address is within range - exclude status line.
 
@@ -185,8 +196,12 @@ class Display:
 
         return True
 
-    def buffered_write(self, byte, row, column):
-        index = self._get_index(row, column)
+    def buffered_write(self, byte, index=None, row=None, column=None):
+        if index is None:
+            if row is None or column is None:
+                raise ValueError('Either index or row and column is required')
+
+            index = self._get_index(row, column)
 
         # TODO: Verify that index is within range.
 
@@ -222,7 +237,7 @@ class Display:
 
         self.dirty.clear()
 
-        self.move_cursor(0, 0, force_load=True)
+        self.move_cursor(row=0, column=0, force_load=True)
 
     def _get_index(self, row, column):
         return (row * self.dimensions.columns) + column

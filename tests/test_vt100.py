@@ -27,13 +27,13 @@ class SessionHandleHostTestCase(unittest.TestCase):
             session.handle_host()
 
         # Assert
-        terminal.display.buffered_write.assert_any_call(0x80, 0, 0)
-        terminal.display.buffered_write.assert_any_call(0x81, 0, 1)
-        terminal.display.buffered_write.assert_any_call(0x82, 0, 2)
+        terminal.display.buffered_write.assert_any_call(0x80, row=0, column=0)
+        terminal.display.buffered_write.assert_any_call(0x81, row=0, column=1)
+        terminal.display.buffered_write.assert_any_call(0x82, row=0, column=2)
 
         terminal.display.flush.assert_called()
 
-        terminal.display.move_cursor.assert_called_with(0, 3)
+        terminal.display.move_cursor.assert_called_with(row=0, column=3)
 
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):

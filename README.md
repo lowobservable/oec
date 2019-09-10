@@ -2,7 +2,7 @@
 
 oec is an open replacement for the IBM 3174 Establishment Controller.
 
-It is still a work in progress - as of now it only provides basic VT100 emulation but the goal is to implement TN3270 and multiple logical terminal support.
+It is a work in progress - as of now it only provides basic TN3270 and VT100 emulation.
 
 ## Usage
 
@@ -16,12 +16,19 @@ python -m venv VIRTUALENV
 pip install -r requirements.txt --no-deps
 ```
 
-Assuming your interface is connected to `/dev/ttyUSB0` and you want to run `/bin/sh` as the host process:
+Assuming your interface is connected to `/dev/ttyUSB0` and you want to connect to a TN3270 host named `mainframe`:
 
 ```
-python -m oec /dev/ttyUSB0 /bin/sh -l
+python -m oec /dev/ttyUSB0 tn3270 mainframe
+```
+
+If you want to use the VT100 emulator and run `/bin/sh` as the host process:
+
+```
+python -m oec /dev/ttyUSB0 vt100 /bin/sh -l
 ```
 
 ## See Also
 
-* [coax-interface](https://github.com/lowobservable/coax-interface) - tools for interfacing with IBM 3270 type terminals
+* [coax-interface](https://github.com/lowobservable/coax-interface) - Tools for interfacing with IBM 3270 type terminals
+* [pytn3270](https://github.com/lowobservable/pytn3270) - Python TN3270 library

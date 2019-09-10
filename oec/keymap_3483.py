@@ -213,11 +213,17 @@ KEYMAP_SHIFT = {
 
     # Center
     99: Key.ROLL_UP,
-    96: Key.ROLL_DOWN,
+    96: Key.ROLL_DOWN
 }
 
 KEYMAP_ALT = {
-    **KEYMAP_DEFAULT
+    **KEYMAP_DEFAULT,
+
+    # Control Keys
+    6: Key.CLEAR,
+
+    # Center
+    98: Key.HOME
 }
 
 KEYMAP = Keymap('3483', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, modifier_release=240)

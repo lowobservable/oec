@@ -5,20 +5,47 @@ from serial import Serial
 from coax import Interface1
 
 from .controller import Controller
+from .tn3270 import TN3270Session
 from .vt100 import VT100Session
 
 logging.basicConfig(level=logging.INFO)
 
-def main():
-    parser = argparse.ArgumentParser(description='VT100 emulator.')
+def _create_session(args, terminal):
+    if args.emulator == 'tn3270':
+        return TN3270Session(terminal, args.host, args.port)
 
-    parser.add_argument('port', help='Serial port')
-    parser.add_argument('command', help='Host process')
-    parser.add_argument('command_args', nargs=argparse.REMAINDER, help='Host process arguments')
+    if args.emulator == 'vt100':
+        host_command = [args.command, *args.command_args]
+
+        return VT100Session(terminal, host_command)
+
+    raise ValueError('Unsupported emulator')
+
+def main():
+    parser = argparse.ArgumentParser(description=('An open replacement for the IBM 3174 '
+                                                  'Establishment Controller'))
+
+    parser.add_argument('serial_port', help='Serial port')
+
+    subparsers = parser.add_subparsers(dest='emulator', required=True,
+                                       description='Emulator')
+
+    tn3270_parser = subparsers.add_parser('tn3270', description='TN3270 emulator',
+                                          help='TN3270 emulator')
+
+    tn3270_parser.add_argument('host', help='Hostname')
+    tn3270_parser.add_argument('port', nargs='?', default=23, type=int)
+
+    vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
+                                         help='VT100 emulator')
+
+    vt100_parser.add_argument('command', help='Host process')
+    vt100_parser.add_argument('command_args', nargs=argparse.REMAINDER,
+                              help='Host process arguments')
 
     args = parser.parse_args()
 
-    with Serial(args.port, 115200) as serial:
+    with Serial(args.serial_port, 115200) as serial:
         serial.reset_input_buffer()
         serial.reset_output_buffer()
 
@@ -33,9 +60,7 @@ def main():
         print(f'Interface firmware version {firmware_version}')
 
         # Initialize and start the controller.
-        host_command = [args.command, *args.command_args]
-
-        create_session = lambda terminal: VT100Session(terminal, host_command)
+        create_session = lambda terminal: _create_session(args, terminal)
 
         controller = Controller(interface, create_session)
 

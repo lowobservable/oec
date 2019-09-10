@@ -181,6 +181,9 @@ KEYMAP_ALT = {
     48: Key.PF11,
     17: Key.PF12,
 
+    # Second Row
+    53: Key.HOME,
+
     # Right
     95: Key.PA1,
     94: Key.PA2,

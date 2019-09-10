@@ -99,32 +99,36 @@ class VT100Session(Session):
         self.terminal.display.status_line.write_string(45, 'VT100')
 
         # Reset the cursor.
-        self.terminal.display.move_cursor(0, 0)
+        self.terminal.display.move_cursor(row=0, column=0)
 
     def terminate(self):
         if self.host_process:
             self._terminate_host_process()
 
     def handle_host(self):
+        data = None
+
         try:
             if self.host_process not in select([self.host_process], [], [], 0)[0]:
                 return False
 
             data = self.host_process.read()
-
-            self._handle_host_output(data)
-
-            return True
         except EOFError:
             self.host_process = None
 
             raise SessionDisconnectedError
 
+        self._handle_host_output(data)
+
+        return True
+
     def handle_key(self, key, keyboard_modifiers, scan_code):
         bytes_ = self._map_key(key, keyboard_modifiers)
 
-        if bytes_ is not None:
-            self.host_process.write(bytes_)
+        if bytes_ is None:
+            return
+
+        self.host_process.write(bytes_)
 
     def _map_key(self, key, keyboard_modifiers):
         if keyboard_modifiers.is_alt():
@@ -193,7 +197,7 @@ class VT100Session(Session):
                 # TODO: Investigate multi-byte or zero-byte cases further.
                 byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
-                self.terminal.display.buffered_write(byte, row, column)
+                self.terminal.display.buffered_write(byte, row=row, column=column)
 
     def _flush(self):
         self.terminal.display.flush()
@@ -202,4 +206,4 @@ class VT100Session(Session):
         # reliable - maybe it needs to be forced sometimes.
         cursor = self.vt100_screen.cursor
 
-        self.terminal.display.move_cursor(cursor.y, cursor.x)
+        self.terminal.display.move_cursor(row=cursor.y, column=cursor.x)
