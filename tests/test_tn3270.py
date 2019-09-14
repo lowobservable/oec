@@ -49,6 +49,8 @@ class SessionHandleHostTestCase(unittest.TestCase):
         _set_attribute(cells, 104, MockAttribute(protected=True))
 
         self.session.emulator.cells = cells
+        self.session.emulator.dirty = set(range(105))
+
         self.session.emulator.cursor_address = 8
 
         # Act and assert
@@ -76,6 +78,7 @@ class SessionHandleHostTestCase(unittest.TestCase):
         self.session.emulator.update = Mock(return_value=True)
 
         self.session.emulator.cells = _create_screen_cells(24, 80)
+        self.session.emulator.dirty = set()
 
         # Act
         self.session.handle_host()
@@ -92,6 +95,7 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         self.session.emulator = Mock()
 
         self.session.emulator.cells = []
+        self.session.emulator.dirty = set()
 
     def test_enter(self):
         # Act

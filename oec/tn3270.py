@@ -142,7 +142,9 @@ class TN3270Session(Session):
         self.telnet = None
 
     def _apply(self):
-        for (address, cell) in enumerate(self.emulator.cells):
+        for address in self.emulator.dirty:
+            cell = self.emulator.cells[address]
+
             byte = 0x00
 
             if isinstance(cell, AttributeCell):
@@ -151,6 +153,8 @@ class TN3270Session(Session):
                 byte = encode_ebcdic_character(cell.byte)
 
             self.terminal.display.buffered_write(byte, index=address)
+
+        self.emulator.dirty.clear()
 
         # Update the message area.
         self.message_area = self._format_message_area()
