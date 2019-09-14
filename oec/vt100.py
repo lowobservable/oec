@@ -181,15 +181,12 @@ class VT100Session(Session):
 
         self.vt100_stream.feed(data)
 
-        self._apply(self.vt100_screen)
-
-        self.vt100_screen.dirty.clear()
-
+        self._apply()
         self._flush()
 
-    def _apply(self, screen):
-        for row in screen.dirty:
-            row_buffer = screen.buffer[row]
+    def _apply(self):
+        for row in self.vt100_screen.dirty:
+            row_buffer = self.vt100_screen.buffer[row]
 
             for column in range(self.terminal.display.dimensions.columns):
                 character = row_buffer[column]
@@ -198,6 +195,8 @@ class VT100Session(Session):
                 byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
                 self.terminal.display.buffered_write(byte, row=row, column=column)
+
+        self.vt100_screen.dirty.clear()
 
     def _flush(self):
         self.terminal.display.flush()
