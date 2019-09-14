@@ -35,6 +35,8 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         terminal.display.move_cursor.assert_called_with(row=0, column=3)
 
+        self.assertFalse(session.vt100_screen.dirty)
+
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):
         self.terminal = Mock()

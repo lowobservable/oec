@@ -63,6 +63,8 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.assertEqual(self.terminal.display.cursor_index, 8)
 
+        self.assertFalse(self.session.emulator.dirty)
+
     def test_eof(self):
         # Arrange
         self.session.emulator.update = Mock(side_effect=EOFError)
