@@ -55,6 +55,8 @@ class TN3270Session(Session):
 
         self.telnet = None
         self.emulator = None
+
+        self.waiting_on_host = False
         self.operator_error = None
 
         # TODO: Should the message area be initialized here?
@@ -83,6 +85,8 @@ class TN3270Session(Session):
 
             raise SessionDisconnectedError
 
+        self.waiting_on_host = False
+
         self._apply()
         self._flush()
 
@@ -95,7 +99,7 @@ class TN3270Session(Session):
             if aid is not None:
                 self.emulator.aid(aid)
 
-                # TODO: is this where we show the clock?
+                self.waiting_on_host = True
             #elif key == Key.RESET:
             elif key == Key.BACKSPACE:
                 self.emulator.backspace()
@@ -194,10 +198,12 @@ class TN3270Session(Session):
     def _format_message_area(self):
         message_area = b''
 
-        if self.operator_error:
-            if isinstance(self.operator_error, ProtectedCellOperatorError):
-                # X SPACE ARROW_LEFT OPERATOR ARROW_RIGHT
-                message_area = b'\xf6\x00\xf8\xdb\xd8'
+        if self.waiting_on_host:
+            # X SPACE CLOCK_LEFT CLOCK_RIGHT
+            message_area = b'\xf6\x00\xf4\xf5'
+        elif isinstance(self.operator_error, ProtectedCellOperatorError):
+            # X SPACE ARROW_LEFT OPERATOR ARROW_RIGHT
+            message_area = b'\xf6\x00\xf8\xdb\xd8'
         elif self.emulator.keyboard_locked:
             # X SPACE SYSTEM
             message_area = b'\xf6\x00' + encode_string('SYSTEM')
