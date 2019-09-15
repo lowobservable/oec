@@ -6,7 +6,7 @@ import context
 from oec.session import SessionDisconnectedError
 from oec.keyboard import Key, KeyboardModifiers
 from oec.tn3270 import TN3270Session
-from tn3270 import AttributeCell, CharacterCell, AID, ProtectedCellOperatorError
+from tn3270 import AttributeCell, CharacterCell, AID, ProtectedCellOperatorError, FieldOverflowOperatorError
 
 class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
@@ -188,7 +188,20 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
 
         # Assert
-        self.session.emulator.input.assert_called_with(0x81)
+        self.session.emulator.input.assert_called_with(0x81, False)
+
+    def test_insert(self):
+        # Act
+        self.session.handle_key(Key.INSERT, KeyboardModifiers.NONE, None)
+
+        self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
+
+        self.session.handle_key(Key.INSERT, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.assertFalse(self.session.keyboard_insert)
+
+        self.session.emulator.input.assert_called_with(0x81, True)
 
     def test_protected_cell_operator_error(self):
         # Arrange
@@ -199,6 +212,16 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
         # Assert
         self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600f8dbd800000000'))
+
+    def test_field_overflow_operator_error(self):
+        # Arrange
+        self.session.emulator.input = Mock(side_effect=FieldOverflowOperatorError)
+
+        # Act
+        self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600db080000000000'))
 
 class MockDisplay:
     def __init__(self, rows, columns):

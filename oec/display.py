@@ -307,7 +307,13 @@ class StatusLine:
 
         if modifiers.is_shift():
             indicators[0] = 0xda
-        else:
-            indicators[0] = 0x00
 
         self.write(35, indicators)
+
+    def write_keyboard_insert(self, insert):
+        indicators = bytearray(1)
+
+        if insert:
+            indicators[0] = 0xd3
+
+        self.write(45, indicators)

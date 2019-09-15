@@ -5,7 +5,7 @@ oec.tn3270
 
 import logging
 from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, OperatorError, \
-                   ProtectedCellOperatorError
+                   ProtectedCellOperatorError, FieldOverflowOperatorError
 
 from .session import Session, SessionDisconnectedError
 from .display import encode_ebcdic_character, encode_string
@@ -56,6 +56,7 @@ class TN3270Session(Session):
         self.telnet = None
         self.emulator = None
 
+        self.keyboard_insert = False
         self.waiting_on_host = False
         self.operator_error = None
 
@@ -119,19 +120,25 @@ class TN3270Session(Session):
                 self.emulator.cursor_left()
             elif key == Key.RIGHT:
                 self.emulator.cursor_right()
-            #elif key == Key.INSERT:
+            elif key == Key.INSERT:
+                self._handle_insert_key()
             elif key == Key.DELETE:
                 self.emulator.delete()
             else:
                 byte = get_ebcdic_character_for_key(key)
 
                 if byte:
-                    self.emulator.input(byte)
+                    self.emulator.input(byte, self.keyboard_insert)
         except OperatorError as error:
             self.operator_error = error
 
         self._apply()
         self._flush()
+
+    def _handle_insert_key(self):
+        self.keyboard_insert = not self.keyboard_insert
+
+        self.terminal.display.status_line.write_keyboard_insert(self.keyboard_insert)
 
     def _connect_host(self):
         terminal_type = f'IBM-3278-{self.terminal.terminal_id.model}'
@@ -204,6 +211,9 @@ class TN3270Session(Session):
         elif isinstance(self.operator_error, ProtectedCellOperatorError):
             # X SPACE ARROW_LEFT OPERATOR ARROW_RIGHT
             message_area = b'\xf6\x00\xf8\xdb\xd8'
+        elif isinstance(self.operator_error, FieldOverflowOperatorError):
+            # X SPACE OPERATOR >
+            message_area = b'\xf6\x00\xdb' + encode_string('>')
         elif self.emulator.keyboard_locked:
             # X SPACE SYSTEM
             message_area = b'\xf6\x00' + encode_string('SYSTEM')
