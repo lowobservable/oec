@@ -1,4 +1,5 @@
 import time
+import signal
 import logging
 import argparse
 from serial import Serial
@@ -11,6 +12,8 @@ from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from .keymap_3483 import KEYMAP as KEYMAP_3483
 
 logging.basicConfig(level=logging.INFO)
+
+controller = None
 
 def _get_keymap(terminal_id, extended_id):
     keymap = KEYMAP_3278_2
@@ -31,7 +34,22 @@ def _create_session(args, terminal):
 
     raise ValueError('Unsupported emulator')
 
+def _signal_handler(number, frame):
+    global controller
+
+    print('Stopping controller...')
+
+    if controller:
+        controller.stop()
+
+        controller = None
+
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
+
 def main():
+    global controller
+
     parser = argparse.ArgumentParser(description=('An open replacement for the IBM 3174 '
                                                   'Establishment Controller'))
 

@@ -69,6 +69,14 @@ class Controller:
             if poll_response:
                 self._handle_poll_response(poll_response)
 
+        self._terminate_session()
+
+        if self.terminal:
+            self.terminal = None
+
+    def stop(self):
+        self.running = False
+
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
 
@@ -99,10 +107,7 @@ class Controller:
     def _handle_terminal_detached(self):
         self.logger.info('Terminal detached')
 
-        if self.session:
-            self.session.terminate()
-
-            self.session = None
+        self._terminate_session()
 
         self.terminal = None
 
@@ -118,6 +123,14 @@ class Controller:
         self.session = self.create_session(self.terminal)
 
         self.session.start()
+
+    def _terminate_session(self):
+        if not self.session:
+            return
+
+        self.session.terminate()
+
+        self.session = None
 
     def _handle_poll_response(self, poll_response):
         if isinstance(poll_response, KeystrokePollResponse):
