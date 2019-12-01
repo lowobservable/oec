@@ -14,12 +14,13 @@ from .session import SessionDisconnectedError
 class Controller:
     """The controller."""
 
-    def __init__(self, interface, create_session):
+    def __init__(self, interface, get_keymap, create_session):
         self.logger = logging.getLogger(__name__)
 
         self.running = False
 
         self.interface = interface
+        self.get_keymap = get_keymap
         self.create_session = create_session
 
         self.terminal = None
@@ -76,8 +77,11 @@ class Controller:
 
         self.logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
 
+        # Get the keymap.
+        keymap = self.get_keymap(terminal_id, extended_id)
+
         # Initialize the terminal.
-        self.terminal = Terminal(self.interface, terminal_id, extended_id)
+        self.terminal = Terminal(self.interface, terminal_id, extended_id, keymap)
 
         (rows, columns) = self.terminal.display.dimensions
         keymap_name = self.terminal.keyboard.keymap.name

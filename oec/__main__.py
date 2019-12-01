@@ -7,8 +7,18 @@ from coax import Interface1
 from .controller import Controller
 from .tn3270 import TN3270Session
 from .vt100 import VT100Session
+from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from .keymap_3483 import KEYMAP as KEYMAP_3483
 
 logging.basicConfig(level=logging.INFO)
+
+def _get_keymap(terminal_id, extended_id):
+    keymap = KEYMAP_3278_2
+
+    if extended_id == 'c1348300':
+        keymap = KEYMAP_3483
+
+    return keymap
 
 def _create_session(args, terminal):
     if args.emulator == 'tn3270':
@@ -62,7 +72,7 @@ def main():
         # Initialize and start the controller.
         create_session = lambda terminal: _create_session(args, terminal)
 
-        controller = Controller(interface, create_session)
+        controller = Controller(interface, _get_keymap, create_session)
 
         print('Starting controller...')
 
