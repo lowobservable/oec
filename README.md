@@ -2,6 +2,8 @@
 
 oec is an open replacement for the IBM 3174 Establishment Controller.
 
+![IBM 3278 terminal and oec](.images/hero.jpg)
+
 It is a work in progress - as of now it only provides basic TN3270 and VT100 emulation.
 
 ## Usage
@@ -16,16 +18,16 @@ python -m venv VIRTUALENV
 pip install -r requirements.txt --no-deps
 ```
 
-Assuming your interface is connected to `/dev/ttyUSB0` and you want to connect to a TN3270 host named `mainframe`:
+Assuming your interface is connected to `/dev/ttyACM0` and you want to connect to a TN3270 host named `mainframe`:
 
 ```
-python -m oec /dev/ttyUSB0 tn3270 mainframe
+python -m oec /dev/ttyACM0 tn3270 mainframe
 ```
 
 If you want to use the VT100 emulator and run `/bin/sh` as the host process:
 
 ```
-python -m oec /dev/ttyUSB0 vt100 /bin/sh -l
+python -m oec /dev/ttyACM0 vt100 /bin/sh -l
 ```
 
 ## See Also
