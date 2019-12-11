@@ -43,31 +43,7 @@ class Controller:
         self.running = True
 
         while self.running:
-            if self.session:
-                try:
-                    self.session.handle_host()
-                except SessionDisconnectedError:
-                    self._handle_session_disconnected()
-
-            try:
-                poll_response = self._poll()
-            except ReceiveTimeout:
-                if self.terminal:
-                    self._handle_terminal_detached()
-
-                continue
-            except ReceiveError as error:
-                self.logger.warning(f'POLL receive error: {error}', exc_info=error)
-                continue
-            except ProtocolError as error:
-                self.logger.warning(f'POLL protocol error: {error}', exc_info=error)
-                continue
-
-            if not self.terminal:
-                self._handle_terminal_attached(poll_response)
-
-            if poll_response:
-                self._handle_poll_response(poll_response)
+            self._run_loop()
 
         self._terminate_session()
 
@@ -76,6 +52,33 @@ class Controller:
 
     def stop(self):
         self.running = False
+
+    def _run_loop(self):
+        if self.session:
+            try:
+                self.session.handle_host()
+            except SessionDisconnectedError:
+                self._handle_session_disconnected()
+
+        try:
+            poll_response = self._poll()
+        except ReceiveTimeout:
+            if self.terminal:
+                self._handle_terminal_detached()
+
+            return
+        except ReceiveError as error:
+            self.logger.warning(f'POLL receive error: {error}', exc_info=error)
+            return
+        except ProtocolError as error:
+            self.logger.warning(f'POLL protocol error: {error}', exc_info=error)
+            return
+
+        if not self.terminal:
+            self._handle_terminal_attached(poll_response)
+
+        if poll_response:
+            self._handle_poll_response(poll_response)
 
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
@@ -156,7 +159,7 @@ class Controller:
             self.session.handle_key(key, modifiers, scan_code)
 
     def _poll(self):
-        delay = self._calculate_poll_delay()
+        delay = self._calculate_poll_delay(time.perf_counter())
 
         if delay > 0:
             time.sleep(delay)
@@ -177,7 +180,7 @@ class Controller:
 
         return poll_response
 
-    def _calculate_poll_delay(self):
+    def _calculate_poll_delay(self, current_time):
         if self.last_poll_response is not None:
             return 0
 
@@ -189,4 +192,4 @@ class Controller:
         else:
             period = self.disconnected_poll_period
 
-        return (self.last_poll_time + period) - time.perf_counter()
+        return (self.last_poll_time + period) - current_time

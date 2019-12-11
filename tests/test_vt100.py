@@ -8,7 +8,8 @@ from oec.keyboard import Key, KeyboardModifiers
 from oec.vt100 import VT100Session, select
 
 class SessionHandleHostTestCase(unittest.TestCase):
-    def test(self):
+    @patch('oec.vt100.select')
+    def test(self, select_mock):
         # Arrange
         terminal = Mock()
 
@@ -20,11 +21,10 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         session.host_process.read = Mock(return_value=b'abc')
 
-        # Act
-        with patch('oec.vt100.select') as select_patch:
-            select_patch.return_value = [[session.host_process]]
+        select_mock.return_value = [[session.host_process]]
 
-            session.handle_host()
+        # Act
+        session.handle_host()
 
         # Assert
         terminal.display.buffered_write.assert_any_call(0x80, row=0, column=0)
