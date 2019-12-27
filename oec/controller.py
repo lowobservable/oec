@@ -5,7 +5,7 @@ oec.controller
 
 import time
 import logging
-from coax import poll, poll_ack, KeystrokePollResponse, ReceiveTimeout, \
+from coax import poll, poll_ack, PollAction, KeystrokePollResponse, ReceiveTimeout, \
                  ReceiveError, ProtocolError
 
 from .terminal import Terminal, read_terminal_ids
@@ -166,7 +166,9 @@ class Controller:
 
         self.last_poll_time = time.perf_counter()
 
-        poll_response = poll(self.interface, timeout=1)
+        poll_action = self.terminal.get_poll_action() if self.terminal else PollAction.NONE
+
+        poll_response = poll(self.interface, poll_action, timeout=1)
 
         if poll_response:
             try:

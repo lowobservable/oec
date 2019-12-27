@@ -86,6 +86,14 @@ class VT100Session(Session):
 
         self.vt100_screen.write_process_input = lambda data: self.host_process.write(data.encode())
 
+        # Unfortunately multiple VT100 bells will be replaced with a single 3270 terminal
+        # alarm - also because the alarm is only sounded on terminal POLL the alarm sound
+        # may appear out of sync with the terminal.
+        #
+        # A better approach may be to perform a flush when the bell is encountered but
+        # that does not appear possible with the standard pyte ByteStream.
+        self.vt100_screen.bell = lambda: self.terminal.sound_alarm()
+
         self.vt100_stream = pyte.ByteStream(self.vt100_screen)
 
     def start(self):

@@ -5,7 +5,8 @@ oec.terminal
 
 import time
 import logging
-from coax import read_terminal_id, read_extended_id, ReceiveError, ProtocolError
+from coax import read_terminal_id, read_extended_id, PollAction, ReceiveError, \
+                 ProtocolError
 
 from .display import Dimensions, Display 
 from .keyboard import Keyboard
@@ -67,3 +68,16 @@ class Terminal:
 
         self.display = Display(interface, dimensions)
         self.keyboard = Keyboard(keymap)
+
+        self.alarm = False
+
+    def sound_alarm(self):
+        self.alarm = True
+
+    def get_poll_action(self):
+        if self.alarm:
+            self.alarm = False
+
+            return PollAction.ALARM
+
+        return PollAction.NONE

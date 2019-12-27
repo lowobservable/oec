@@ -8,34 +8,50 @@ from oec.keyboard import Key, KeyboardModifiers
 from oec.vt100 import VT100Session, select
 
 class SessionHandleHostTestCase(unittest.TestCase):
-    @patch('oec.vt100.select')
-    def test(self, select_mock):
+    def setUp(self):
+        self.terminal = Mock()
+
+        self.terminal.display.dimensions = Dimensions(24, 80)
+
+        self.session = VT100Session(self.terminal, None)
+
+        self.session.host_process = Mock()
+
+        patcher = patch('oec.vt100.select')
+
+        select_mock = patcher.start()
+
+        select_mock.return_value = [[self.session.host_process]]
+
+        self.addCleanup(patch.stopall)
+
+    def test(self):
         # Arrange
-        terminal = Mock()
-
-        terminal.display.dimensions = Dimensions(24, 80)
-
-        session = VT100Session(terminal, None)
-
-        session.host_process = Mock()
-
-        session.host_process.read = Mock(return_value=b'abc')
-
-        select_mock.return_value = [[session.host_process]]
+        self.session.host_process.read = Mock(return_value=b'abc')
 
         # Act
-        session.handle_host()
+        self.session.handle_host()
 
         # Assert
-        terminal.display.buffered_write.assert_any_call(0x80, row=0, column=0)
-        terminal.display.buffered_write.assert_any_call(0x81, row=0, column=1)
-        terminal.display.buffered_write.assert_any_call(0x82, row=0, column=2)
+        self.terminal.display.buffered_write.assert_any_call(0x80, row=0, column=0)
+        self.terminal.display.buffered_write.assert_any_call(0x81, row=0, column=1)
+        self.terminal.display.buffered_write.assert_any_call(0x82, row=0, column=2)
 
-        terminal.display.flush.assert_called()
+        self.terminal.display.flush.assert_called()
 
-        terminal.display.move_cursor.assert_called_with(row=0, column=3)
+        self.terminal.display.move_cursor.assert_called_with(row=0, column=3)
 
-        self.assertFalse(session.vt100_screen.dirty)
+        self.assertFalse(self.session.vt100_screen.dirty)
+
+    def test_bell(self):
+        # Arrange
+        self.session.host_process.read = Mock(return_value=b'\a')
+
+        # Act
+        self.session.handle_host()
+
+        # Assert
+        self.terminal.sound_alarm.assert_called()
 
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):

@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
-from coax import PowerOnResetCompletePollResponse, KeystrokePollResponse, ReceiveTimeout
+from coax import PollAction, PowerOnResetCompletePollResponse, KeystrokePollResponse, ReceiveTimeout
 from coax.protocol import TerminalId
 
 import context
@@ -96,6 +96,23 @@ class RunLoopTestCase(unittest.TestCase):
         self.assertIsNotNone(self.controller.session)
 
         self.assertEqual(self.create_session_mock.call_count, 2)
+
+    def test_alarm(self):
+        # Arrange
+        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
+        self._assert_run_loop(0, None, 0, False)
+
+        self.assertIsNotNone(self.controller.terminal)
+
+        # Act
+        self.controller.terminal.sound_alarm()
+
+        # Assert
+        self._assert_run_loop(0.5, None, 0.5, False)
+
+        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.ALARM)
+
+        self.assertFalse(self.controller.terminal.alarm)
 
     def _assert_run_loop(self, poll_time, poll_response, expected_delay, expected_poll_ack):
         # Arrange

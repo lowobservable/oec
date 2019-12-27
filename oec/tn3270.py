@@ -71,6 +71,8 @@ class TN3270Session(Session):
 
         self.emulator = Emulator(self.telnet, rows, columns)
 
+        self.emulator.alarm = lambda: self.terminal.sound_alarm()
+
     def terminate(self):
         if self.telnet:
             self._disconnect_host()
