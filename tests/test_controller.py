@@ -37,6 +37,10 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.read_terminal_ids_mock.return_value = TERMINAL_IDS
 
+        patcher = patch('oec.controller.load_control_register')
+
+        self.load_control_register_mock = patcher.start()
+
         patcher = patch('oec.controller.time.perf_counter')
 
         self.perf_counter_mock = patcher.start()
@@ -114,7 +118,57 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.assertFalse(self.controller.terminal.alarm)
 
-    def test_clicker_toggle(self):
+    def test_toggle_cursor_blink(self):
+        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
+
+        self.assertFalse(self.controller.terminal.display.cursor_blink)
+
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), 0, True)
+
+        self.assertTrue(self.controller.terminal.display.cursor_blink)
+
+        self.load_control_register_mock.assert_called()
+
+        self.assertTrue(self.load_control_register_mock.call_args[0][1].cursor_blink)
+
+        self.load_control_register_mock.reset_mock()
+
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), 0, True)
+
+        self.assertFalse(self.controller.terminal.display.cursor_blink)
+
+        self.load_control_register_mock.assert_called()
+
+        self.assertFalse(self.load_control_register_mock.call_args[0][1].cursor_blink)
+
+    def test_toggle_cursor_reverse(self):
+        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
+
+        self.assertFalse(self.controller.terminal.display.cursor_reverse)
+
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), 0, True)
+
+        self.assertTrue(self.controller.terminal.display.cursor_reverse)
+
+        self.load_control_register_mock.assert_called()
+
+        self.assertTrue(self.load_control_register_mock.call_args[0][1].cursor_reverse)
+
+        self.load_control_register_mock.reset_mock()
+
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), 0, True)
+
+        self.assertFalse(self.controller.terminal.display.cursor_reverse)
+
+        self.load_control_register_mock.assert_called()
+
+        self.assertFalse(self.load_control_register_mock.call_args[0][1].cursor_reverse)
+
+    def test_toggle_clicker(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
 
         self.assertFalse(self.controller.terminal.keyboard.clicker)

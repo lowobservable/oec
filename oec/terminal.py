@@ -5,7 +5,7 @@ oec.terminal
 
 import time
 import logging
-from coax import read_terminal_id, read_extended_id, PollAction, ReceiveError, \
+from coax import read_terminal_id, read_extended_id, PollAction, Control, ReceiveError, \
                  ProtocolError
 
 from .display import Dimensions, Display 
@@ -87,3 +87,9 @@ class Terminal:
             return PollAction.ENABLE_KEYBOARD_CLICKER if self.keyboard.clicker else PollAction.DISABLE_KEYBOARD_CLICKER
 
         return PollAction.NONE
+
+    def get_control_register(self):
+        control = Control(cursor_reverse=self.display.cursor_reverse,
+                          cursor_blink=self.display.cursor_blink)
+
+        return control

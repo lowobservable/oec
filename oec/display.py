@@ -181,6 +181,9 @@ class Display:
 
         self.status_line = StatusLine(self.interface, columns)
 
+        self.cursor_reverse = False
+        self.cursor_blink = False
+
     def move_cursor(self, index=None, row=None, column=None, force_load=False):
         """Load the address counter."""
         address = self._calculate_address(index=index, row=row, column=column)
@@ -238,6 +241,12 @@ class Display:
         self.dirty.clear()
 
         self.move_cursor(row=0, column=0, force_load=True)
+
+    def toggle_cursor_blink(self):
+        self.cursor_blink = not self.cursor_blink
+
+    def toggle_cursor_reverse(self):
+        self.cursor_reverse = not self.cursor_reverse
 
     def _get_index(self, row, column):
         return (row * self.dimensions.columns) + column

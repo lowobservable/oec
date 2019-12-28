@@ -5,8 +5,8 @@ oec.controller
 
 import time
 import logging
-from coax import poll, poll_ack, PollAction, KeystrokePollResponse, ReceiveTimeout, \
-                 ReceiveError, ProtocolError
+from coax import poll, poll_ack, load_control_register, PollAction, \
+                 KeystrokePollResponse, ReceiveTimeout, ReceiveError, ProtocolError
 
 from .terminal import Terminal, read_terminal_ids
 from .keyboard import Key
@@ -156,8 +156,16 @@ class Controller:
         if not key:
             return
 
-        if key == Key.CLICKER:
-            self.terminal.keyboard.clicker = not self.terminal.keyboard.clicker
+        if key == Key.CURSOR_BLINK:
+            self.terminal.display.toggle_cursor_blink()
+
+            self._load_control_register()
+        elif key == Key.ALT_CURSOR:
+            self.terminal.display.toggle_cursor_reverse()
+
+            self._load_control_register()
+        elif key == Key.CLICKER:
+            self.terminal.keyboard.toggle_clicker()
         elif self.session:
             self.session.handle_key(key, modifiers, scan_code)
 
@@ -198,3 +206,6 @@ class Controller:
             period = self.disconnected_poll_period
 
         return (self.last_poll_time + period) - current_time
+
+    def _load_control_register(self):
+        load_control_register(self.interface, self.terminal.get_control_register())

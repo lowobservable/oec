@@ -333,6 +333,9 @@ class Keyboard:
 
         return (key, self.modifiers, False)
 
+    def toggle_clicker(self):
+        self.clicker = not self.clicker
+
     def _apply_modifiers(self, scan_code, key):
         # TODO: Consider detection, in single modifier release mode, of entering
         # modififier release but the next keystroke not being a modifier... also
