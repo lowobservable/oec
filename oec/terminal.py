@@ -70,6 +70,7 @@ class Terminal:
         self.keyboard = Keyboard(keymap)
 
         self.alarm = False
+        self.last_poll_keyboard_clicker = None
 
     def sound_alarm(self):
         self.alarm = True
@@ -79,5 +80,10 @@ class Terminal:
             self.alarm = False
 
             return PollAction.ALARM
+
+        if self.keyboard.clicker != self.last_poll_keyboard_clicker:
+            self.last_poll_keyboard_clicker = self.keyboard.clicker
+
+            return PollAction.ENABLE_KEYBOARD_CLICKER if self.keyboard.clicker else PollAction.DISABLE_KEYBOARD_CLICKER
 
         return PollAction.NONE

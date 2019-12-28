@@ -9,6 +9,7 @@ from coax import poll, poll_ack, PollAction, KeystrokePollResponse, ReceiveTimeo
                  ReceiveError, ProtocolError
 
 from .terminal import Terminal, read_terminal_ids
+from .keyboard import Key
 from .session import SessionDisconnectedError
 
 class Controller:
@@ -155,7 +156,9 @@ class Controller:
         if not key:
             return
 
-        if self.session:
+        if key == Key.CLICKER:
+            self.terminal.keyboard.clicker = not self.terminal.keyboard.clicker
+        elif self.session:
             self.session.handle_key(key, modifiers, scan_code)
 
     def _poll(self):

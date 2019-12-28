@@ -114,6 +114,25 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.assertFalse(self.controller.terminal.alarm)
 
+    def test_clicker_toggle(self):
+        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
+
+        self.assertFalse(self.controller.terminal.keyboard.clicker)
+
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101011110), 0, True)
+        self._assert_run_loop(0, None, 0, False)
+
+        self.assertTrue(self.controller.terminal.keyboard.clicker)
+
+        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.ENABLE_KEYBOARD_CLICKER)
+
+        self._assert_run_loop(0.5, KeystrokePollResponse(0b0101011110), 0.5, True)
+        self._assert_run_loop(1, None, 0, False)
+
+        self.assertFalse(self.controller.terminal.keyboard.clicker)
+
+        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.DISABLE_KEYBOARD_CLICKER)
+
     def _assert_run_loop(self, poll_time, poll_response, expected_delay, expected_poll_ack):
         # Arrange
         self.poll_mock.side_effect = [poll_response]

@@ -114,7 +114,7 @@ class Key(Enum):
     CURSOR_SELECT = 402
     CURSOR_BLINK = 403
     ERASE_EOF = 404
-    VOLUME = 405
+    CLICKER = 405
     ALT_CURSOR = 406
     IDENT = 407
 
@@ -302,6 +302,8 @@ class Keyboard:
             self.single_modifier_release = False
 
         self.modifier_release = False
+
+        self.clicker = False
 
     def get_key(self, scan_code):
         """Map a scan code to key and update modifiers state."""

@@ -14,7 +14,7 @@ KEYMAP_DEFAULT = {
     84: Key.CURSOR_BLINK,
     85: Key.ERASE_EOF,
     86: Key.PRINT,
-    87: Key.VOLUME,
+    87: Key.CLICKER,
 
     # First Row
     61: Key.BACKTICK,
