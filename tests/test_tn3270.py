@@ -169,12 +169,26 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         # Assert
         self.session.emulator.cursor_left.assert_called()
 
+    def test_left_2(self):
+        # Act
+        self.session.handle_key(Key.LEFT_2, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.cursor_left.assert_called_with(rate=2)
+
     def test_right(self):
         # Act
         self.session.handle_key(Key.RIGHT, KeyboardModifiers.NONE, None)
 
         # Assert
         self.session.emulator.cursor_right.assert_called()
+
+    def test_right_2(self):
+        # Act
+        self.session.handle_key(Key.RIGHT_2, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.cursor_right.assert_called_with(rate=2)
 
     def test_delete(self):
         # Act

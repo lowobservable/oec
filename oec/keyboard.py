@@ -50,8 +50,10 @@ class Key(Enum):
     DELETE = 265
 
     LEFT = 266
+    LEFT_2 = 410
     UP = 267
     RIGHT = 268
+    RIGHT_2 = 411
     DOWN = 269
     ROLL_UP = 270
     ROLL_DOWN = 271

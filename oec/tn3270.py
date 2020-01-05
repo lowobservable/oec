@@ -121,8 +121,12 @@ class TN3270Session(Session):
                 self.emulator.cursor_down()
             elif key == Key.LEFT:
                 self.emulator.cursor_left()
+            elif key == Key.LEFT_2:
+                self.emulator.cursor_left(rate=2)
             elif key == Key.RIGHT:
                 self.emulator.cursor_right()
+            elif key == Key.RIGHT_2:
+                self.emulator.cursor_right(rate=2)
             elif key == Key.INSERT:
                 self._handle_insert_key()
             elif key == Key.DELETE:

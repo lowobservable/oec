@@ -187,8 +187,8 @@ KEYMAP_ALT = {
     # Right
     95: Key.PA1,
     94: Key.PA2,
-    # 22 - Unsure what this key is
-    # 26 - Unsure what this key is
+    22: Key.LEFT_2,
+    26: Key.RIGHT_2
 }
 
 MODIFIER_RELEASE_MAP = {
