@@ -183,6 +183,20 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         # Assert
         self.session.emulator.delete.assert_called()
 
+    def test_dup(self):
+        # Act
+        self.session.handle_key(Key.DUP, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.dup.assert_called()
+
+    def test_field_mark(self):
+        # Act
+        self.session.handle_key(Key.FIELD_MARK, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.field_mark.assert_called()
+
     def test_input(self):
         # Act
         self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)

@@ -6,9 +6,10 @@ oec.tn3270
 import logging
 from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, OperatorError, \
                    ProtectedCellOperatorError, FieldOverflowOperatorError
+from tn3270.ebcdic import DUP, FM
 
 from .session import Session, SessionDisconnectedError
-from .display import encode_ebcdic_character, encode_string
+from .display import encode_ascii_character, encode_ebcdic_character, encode_string
 from .keyboard import Key, get_ebcdic_character_for_key
 
 AID_KEY_MAP = {
@@ -126,6 +127,10 @@ class TN3270Session(Session):
                 self._handle_insert_key()
             elif key == Key.DELETE:
                 self.emulator.delete()
+            elif key == Key.DUP:
+                self.emulator.dup()
+            elif key == Key.FIELD_MARK:
+                self.emulator.field_mark()
             else:
                 byte = get_ebcdic_character_for_key(key)
 
@@ -163,7 +168,7 @@ class TN3270Session(Session):
             if isinstance(cell, AttributeCell):
                 byte = self._map_attribute(cell.attribute)
             elif isinstance(cell, CharacterCell):
-                byte = encode_ebcdic_character(cell.byte)
+                byte = self._map_character(cell.byte)
 
             self.terminal.display.buffered_write(byte, index=address)
 
@@ -203,6 +208,15 @@ class TN3270Session(Session):
             return 0xc8
 
         return 0xc0
+
+    def _map_character(self, byte):
+        if byte == DUP:
+            return encode_ascii_character(ord('*'))
+
+        if byte == FM:
+            return encode_ascii_character(ord(';'))
+
+        return encode_ebcdic_character(byte)
 
     def _format_message_area(self):
         message_area = b''
