@@ -6,6 +6,7 @@ oec.display
 from collections import namedtuple
 import logging
 from sortedcontainers import SortedSet
+from coax import load_address_counter_hi, load_address_counter_lo
 
 _ASCII_CHAR_MAP = {
     '>': 0x08,
@@ -179,7 +180,7 @@ class Display:
 
         self.address_counter = None
 
-        self.status_line = StatusLine(self.interface, columns)
+        self.status_line = StatusLine(self)
 
         self.cursor_reverse = False
         self.cursor_blink = False
@@ -190,14 +191,7 @@ class Display:
 
         # TODO: Verify that the address is within range - exclude status line.
 
-        if address == self.address_counter and not force_load:
-            return False
-
-        self.interface.offload_load_address_counter(address)
-
-        self.address_counter = address
-
-        return True
+        return self._load_address_counter(address, force_load)
 
     def buffered_write(self, byte, index=None, row=None, column=None):
         if index is None:
@@ -227,12 +221,12 @@ class Display:
 
         if clear_status_line:
             address = 0
-            repeat = ((rows + 1) * columns) - 1
+            count = (rows + 1) * columns
         else:
             address = columns
-            repeat = (rows * columns) - 1
+            count = rows * columns
 
-        self.interface.offload_write(b'\x00', address=address, repeat=repeat)
+        self._write((b'\x00', count), address=address)
 
         # Update the buffer and dirty indicators to reflect the cleared screen.
         for index in range(rows * columns):
@@ -271,6 +265,23 @@ class Display:
 
         return address
 
+    def _load_address_counter(self, address, force_load):
+        if address == self.address_counter and not force_load:
+            return False
+
+        (hi, lo) = _split_address(address)
+        (current_hi, current_lo) = _split_address(self.address_counter)
+
+        if hi != current_hi or force_load:
+            load_address_counter_hi(self.interface, hi)
+
+        if lo != current_lo or force_load:
+            load_address_counter_lo(self.interface, lo)
+
+        self.address_counter = address
+
+        return True
+
     def _get_dirty_ranges(self):
         if not self.dirty:
             return []
@@ -287,10 +298,10 @@ class Display:
         address = self._calculate_address(start_index)
 
         try:
-            self.interface.offload_write(data, address=address if address != self.address_counter else None)
+            self._write(data, address=address if address != self.address_counter else None)
         except Exception as error:
             # TODO: This could leave the address_counter incorrect.
-            self.logger.error(f'Offload write error: {error}', exc_info=error)
+            self.logger.error(f'Write error: {error}', exc_info=error)
 
         self.address_counter = self._calculate_address_after_write(address, len(data))
 
@@ -299,14 +310,27 @@ class Display:
 
         return self.address_counter
 
+    def _write(self, data, address=None, restore_original_address=False):
+        if isinstance(data, tuple):
+            offload_data = data[0]
+            offload_repeat = max(data[1] - 1, 0)
+        else:
+            offload_data = data
+            offload_repeat = 0
+
+        self.interface.offload_write(offload_data, address=address,
+                                     restore_original_address=restore_original_address,
+                                     repeat=offload_repeat)
+
 # TODO: add validation of column and data length for write() - must be inside status line
 class StatusLine:
-    def __init__(self, interface, columns):
-        self.interface = interface
-        self.columns = columns
+    def __init__(self, display):
+        self.display = display
+
+        self.columns = display.dimensions.columns
 
     def write(self, column, data):
-        self.interface.offload_write(data, address=column, restore_original_address=True)
+        self.display._write(data, address=column, restore_original_address=True)
 
     def write_string(self, column, string):
         self.write(column, encode_string(string))
@@ -326,3 +350,9 @@ class StatusLine:
             indicators[0] = 0xd3
 
         self.write(45, indicators)
+
+def _split_address(address):
+    if address is None:
+        return (None, None)
+
+    return ((address >> 8) & 0xff, address & 0xff)

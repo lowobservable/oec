@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import context
 
@@ -13,6 +13,18 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
 
         self.display = Display(self.interface, dimensions)
 
+        self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
+
     def test(self):
         # Act
         self.display.move_cursor(index=815)
@@ -20,7 +32,7 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 895)
 
-        self.interface.offload_load_address_counter.assert_called_with(895)
+        self.display._load_address_counter.assert_called_with(895, False)
 
     def test_with_row_and_column(self):
         # Act
@@ -29,35 +41,16 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 895)
 
-        self.interface.offload_load_address_counter.assert_called_with(895)
+        self.display._load_address_counter.assert_called_with(895, False)
 
-    def test_no_change(self):
-        # Arrange
-        self.display.move_cursor(index=0)
-
-        self.interface.offload_load_address_counter.reset_mock()
-
+    def test_force(self):
         # Act
-        self.display.move_cursor(index=0)
+        self.display.move_cursor(index=815, force_load=True)
 
         # Assert
-        self.assertEqual(self.display.address_counter, 80)
+        self.assertEqual(self.display.address_counter, 895)
 
-        self.interface.offload_load_address_counter.assert_not_called()
-
-    def test_no_change_force(self):
-        # Arrange
-        self.display.move_cursor(index=0)
-
-        self.interface.offload_load_address_counter.reset_mock()
-
-        # Act
-        self.display.move_cursor(index=0, force_load=True)
-
-        # Assert
-        self.assertEqual(self.display.address_counter, 80)
-
-        self.interface.offload_load_address_counter.assert_called_with(80)
+        self.display._load_address_counter.assert_called_with(895, True)
 
 class DisplayBufferedWriteTestCase(unittest.TestCase):
     def setUp(self):
@@ -153,6 +146,19 @@ class DisplayClearTestCase(unittest.TestCase):
 
         self.display = Display(self.interface, dimensions)
 
+        self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
+        self.display._write = Mock(wraps=self.display._write)
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
+
     def test_excluding_status_line(self):
         # Arrange
         self.display.buffered_write(0x01, index=0)
@@ -164,8 +170,8 @@ class DisplayClearTestCase(unittest.TestCase):
         self.display.clear(clear_status_line=False)
 
         # Assert
-        self.interface.offload_write.assert_called_with(b'\x00', address=80, repeat=1919)
-        self.interface.offload_load_address_counter.assert_called_with(80)
+        self.display._write.assert_called_with((b'\x00', 1920), address=80)
+        self.display._load_address_counter.assert_called_with(80, True)
 
         self.assertEqual(self.display.buffer[0], 0x00)
         self.assertFalse(self.display.dirty)
@@ -181,8 +187,8 @@ class DisplayClearTestCase(unittest.TestCase):
         self.display.clear(clear_status_line=True)
 
         # Assert
-        self.interface.offload_write.assert_called_with(b'\x00', address=0, repeat=1999)
-        self.interface.offload_load_address_counter.assert_called_with(80)
+        self.display._write.assert_called_with((b'\x00', 2000), address=0)
+        self.display._load_address_counter.assert_called_with(80, True)
 
         self.assertEqual(self.display.buffer[0], 0x00)
         self.assertFalse(self.display.dirty)
@@ -194,6 +200,18 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         dimensions = Dimensions(24, 80)
 
         self.display = Display(self.interface, dimensions)
+
+        self.display._write = Mock(wraps=self.display._write)
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
 
     def test_when_start_address_is_current_address_counter(self):
         # Arrange
@@ -207,7 +225,7 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         self.display.flush()
 
         # Assert
-        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=None)
+        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=None)
 
         self.assertEqual(self.display.address_counter, 83)
         self.assertFalse(self.display.dirty)
@@ -224,10 +242,140 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         self.display.flush()
 
         # Assert
-        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=80)
+        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=80)
 
         self.assertEqual(self.display.address_counter, 83)
         self.assertFalse(self.display.dirty)
+
+class DisplayLoadAddressCounterTestCase(unittest.TestCase):
+    def setUp(self):
+        self.interface = Mock()
+
+        dimensions = Dimensions(24, 80)
+
+        self.display = Display(self.interface, dimensions)
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
+
+    def test(self):
+        # Act
+        self.display._load_address_counter(895, force_load=False)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 895)
+
+        self.load_address_counter_hi_mock.assert_called_with(self.interface, 3)
+        self.load_address_counter_lo_mock.assert_called_with(self.interface, 127)
+
+    def test_hi_change(self):
+        # Arrange
+        self.display._load_address_counter(895, force_load=False)
+
+        self.load_address_counter_hi_mock.reset_mock()
+        self.load_address_counter_lo_mock.reset_mock()
+
+        # Act
+        self.display._load_address_counter(1151, force_load=False)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 1151)
+
+        self.load_address_counter_hi_mock.assert_called_with(self.interface, 4)
+        self.load_address_counter_lo_mock.assert_not_called()
+
+    def test_lo_change(self):
+        # Arrange
+        self.display._load_address_counter(895, force_load=False)
+
+        self.load_address_counter_hi_mock.reset_mock()
+        self.load_address_counter_lo_mock.reset_mock()
+
+        # Act
+        self.display._load_address_counter(896, force_load=False)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 896)
+
+        self.load_address_counter_hi_mock.assert_not_called()
+        self.load_address_counter_lo_mock.assert_called_with(self.interface, 128)
+
+    def test_hi_lo_change(self):
+        # Arrange
+        self.display._load_address_counter(895, force_load=False)
+
+        self.load_address_counter_hi_mock.reset_mock()
+        self.load_address_counter_lo_mock.reset_mock()
+
+        # Act
+        self.display._load_address_counter(1152, force_load=False)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 1152)
+
+        self.load_address_counter_hi_mock.assert_called_with(self.interface, 4)
+        self.load_address_counter_lo_mock.assert_called_with(self.interface, 128)
+
+    def test_no_change(self):
+        # Arrange
+        self.display._load_address_counter(80, force_load=False)
+
+        self.load_address_counter_hi_mock.reset_mock()
+        self.load_address_counter_lo_mock.reset_mock()
+
+        # Act
+        self.display._load_address_counter(80, force_load=False)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 80)
+
+        self.load_address_counter_hi_mock.assert_not_called()
+        self.load_address_counter_lo_mock.assert_not_called()
+
+    def test_no_change_force(self):
+        # Arrange
+        self.display._load_address_counter(80, force_load=False)
+
+        self.load_address_counter_hi_mock.reset_mock()
+        self.load_address_counter_lo_mock.reset_mock()
+
+        # Act
+        self.display._load_address_counter(80, force_load=True)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 80)
+
+        self.load_address_counter_hi_mock.assert_called_with(self.interface, 0)
+        self.load_address_counter_lo_mock.assert_called_with(self.interface, 80)
+
+class DisplayWriteTestCase(unittest.TestCase):
+    def setUp(self):
+        self.interface = Mock()
+
+        dimensions = Dimensions(24, 80)
+
+        self.display = Display(self.interface, dimensions)
+
+    def test(self):
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'))
+
+        # Assert
+        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=None, restore_original_address=False, repeat=0)
+
+    def test_repeat(self):
+        # Act
+        self.display._write((bytes.fromhex('01 02 03'), 3))
+
+        # Assert
+        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=None, restore_original_address=False, repeat=2)
 
 class EncodeAsciiCharacterTestCase(unittest.TestCase):
     def test_mapped_character(self):

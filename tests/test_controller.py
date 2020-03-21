@@ -49,6 +49,14 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.sleep_mock = patcher.start()
 
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        patcher.start()
+
         self.addCleanup(patch.stopall)
 
     def test_no_terminal(self):
