@@ -84,7 +84,7 @@ class TN3270Session(Session):
         try:
             if not self.emulator.update(timeout=0):
                 return False
-        except EOFError:
+        except (EOFError, ConnectionResetError):
             self._disconnect_host()
 
             raise SessionDisconnectedError

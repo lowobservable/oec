@@ -75,6 +75,16 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.telnet.close.assert_called()
 
+    def test_connection_reset(self):
+        # Arrange
+        self.session.emulator.update = Mock(side_effect=ConnectionResetError)
+
+        # Act and assert
+        with self.assertRaises(SessionDisconnectedError):
+            self.session.handle_host()
+
+        self.telnet.close.assert_called()
+
     def test_keyboard_locked(self):
         # Arrange
         self.session.emulator.update = Mock(return_value=True)
