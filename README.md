@@ -1,14 +1,26 @@
 # oec
 
-oec is an open replacement for the IBM 3174 Establishment Controller.
+IBM 3270 terminal controller - an open replacement for the IBM 3174 Establishment Controller.
 
 ![IBM 3278 terminal and oec](.images/hero.jpg)
 
-It is a work in progress - as of now it only provides basic TN3270 and VT100 emulation.
+## Features
+
+This is a work in progress - as of now it only provides basic TN3270 and VT100 emulation.
+
+- [x] TN3270
+    - [x] Basic TN3270
+    - [ ] EAB
+    - [ ] TN3270E
+    - [ ] SSL/TLS
+    - [ ] Non-English character sets
+- [x] VT100
+- [ ] Connection menu
+- [ ] Multiple logical terminals
 
 ## Usage
 
-You will need to build a [interface](https://github.com/lowobservable/coax-interface) and connect it to your computer.
+You will need to build a [interface](https://github.com/lowobservable/coax) and connect it to your computer.
 
 Then configure a Python virtual environment and install dependencies:
 
@@ -32,5 +44,5 @@ python -m oec /dev/ttyACM0 vt100 /bin/sh -l
 
 ## See Also
 
-* [coax-interface](https://github.com/lowobservable/coax-interface) - Tools for interfacing with IBM 3270 type terminals
+* [coax](https://github.com/lowobservable/coax) - Tools for interfacing with IBM 3270 type terminals
 * [pytn3270](https://github.com/lowobservable/pytn3270) - Python TN3270 library
