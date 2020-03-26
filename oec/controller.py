@@ -179,7 +179,7 @@ class Controller:
 
         poll_action = self.terminal.get_poll_action() if self.terminal else PollAction.NONE
 
-        poll_response = poll(self.interface, poll_action, timeout=1)
+        poll_response = poll(self.interface, poll_action, receive_timeout=1)
 
         if poll_response:
             try:

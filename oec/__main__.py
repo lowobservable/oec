@@ -3,7 +3,7 @@ import signal
 import logging
 import argparse
 from serial import Serial
-from coax import Interface1
+from coax import SerialInterface
 
 from .controller import Controller
 from .tn3270 import TN3270Session
@@ -81,7 +81,7 @@ def main():
         time.sleep(3)
 
         # Initialize the interface.
-        interface = Interface1(serial)
+        interface = SerialInterface(serial)
 
         firmware_version = interface.reset()
 

@@ -57,6 +57,10 @@ class RunLoopTestCase(unittest.TestCase):
 
         patcher.start()
 
+        patcher = patch('oec.display.write_data')
+
+        patcher.start()
+
         self.addCleanup(patch.stopall)
 
     def test_no_terminal(self):

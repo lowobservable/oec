@@ -6,7 +6,8 @@ oec.display
 from collections import namedtuple
 import logging
 from sortedcontainers import SortedSet
-from coax import load_address_counter_hi, load_address_counter_lo
+from coax import read_address_counter_hi, read_address_counter_lo, \
+                 load_address_counter_hi, load_address_counter_lo, write_data
 
 _ASCII_CHAR_MAP = {
     '>': 0x08,
@@ -255,6 +256,9 @@ class Display:
         raise ValueError('Either index or row and column is required')
 
     def _calculate_address_after_write(self, address, count):
+        if address is None:
+            return None
+
         address += count
 
         (rows, columns) = self.dimensions
@@ -264,6 +268,12 @@ class Display:
             return None
 
         return address
+
+    def _read_address_counter(self):
+        hi = read_address_counter_hi(self.interface)
+        lo = read_address_counter_lo(self.interface)
+
+        return (hi << 8) | lo
 
     def _load_address_counter(self, address, force_load):
         if address == self.address_counter and not force_load:
@@ -298,12 +308,10 @@ class Display:
         address = self._calculate_address(start_index)
 
         try:
-            self._write(data, address=address if address != self.address_counter else None)
+            self._write(data, address=address)
         except Exception as error:
             # TODO: This could leave the address_counter incorrect.
             self.logger.error(f'Write error: {error}', exc_info=error)
-
-        self.address_counter = self._calculate_address_after_write(address, len(data))
 
         for index in range(start_index, end_index + 1):
             self.dirty.discard(index)
@@ -311,16 +319,26 @@ class Display:
         return self.address_counter
 
     def _write(self, data, address=None, restore_original_address=False):
-        if isinstance(data, tuple):
-            offload_data = data[0]
-            offload_repeat = max(data[1] - 1, 0)
-        else:
-            offload_data = data
-            offload_repeat = 0
+        if restore_original_address:
+            original_address = self.address_counter
 
-        self.interface.offload_write(offload_data, address=address,
-                                     restore_original_address=restore_original_address,
-                                     repeat=offload_repeat)
+            if original_address is None:
+                original_address = self._read_address_counter()
+
+        if address is not None:
+            self._load_address_counter(address, force_load=False)
+
+        write_data(self.interface, data)
+
+        if isinstance(address, tuple):
+            length = len(data[0]) * data[1]
+        else:
+            length = len(data)
+
+        self.address_counter = self._calculate_address_after_write(address, length)
+
+        if restore_original_address:
+            self._load_address_counter(original_address, force_load=True)
 
 # TODO: add validation of column and data length for write() - must be inside status line
 class StatusLine:

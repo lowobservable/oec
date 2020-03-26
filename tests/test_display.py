@@ -157,6 +157,10 @@ class DisplayClearTestCase(unittest.TestCase):
 
         self.load_address_counter_lo_mock = patcher.start()
 
+        patcher = patch('oec.display.write_data')
+
+        self.write_data_mock = patcher.start()
+
         self.addCleanup(patch.stopall)
 
     def test_excluding_status_line(self):
@@ -211,6 +215,10 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
 
         self.load_address_counter_lo_mock = patcher.start()
 
+        patcher = patch('oec.display.write_data')
+
+        self.write_data_mock = patcher.start()
+
         self.addCleanup(patch.stopall)
 
     def test_when_start_address_is_current_address_counter(self):
@@ -225,7 +233,7 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         self.display.flush()
 
         # Assert
-        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=None)
+        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=80)
 
         self.assertEqual(self.display.address_counter, 83)
         self.assertFalse(self.display.dirty)
@@ -363,19 +371,99 @@ class DisplayWriteTestCase(unittest.TestCase):
 
         self.display = Display(self.interface, dimensions)
 
+        self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        patcher = patch('oec.display.write_data')
+
+        self.write_data_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
+
     def test(self):
         # Act
         self.display._write(bytes.fromhex('01 02 03'))
 
         # Assert
-        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=None, restore_original_address=False, repeat=0)
+        self.assertIsNone(self.display.address_counter)
+
+        self.write_data_mock.assert_called_with(self.interface, bytes.fromhex('01 02 03'))
 
     def test_repeat(self):
         # Act
         self.display._write((bytes.fromhex('01 02 03'), 3))
 
         # Assert
-        self.interface.offload_write.assert_called_with(bytes.fromhex('01 02 03'), address=None, restore_original_address=False, repeat=2)
+        self.assertIsNone(self.display.address_counter)
+
+        self.write_data_mock.assert_called_with(self.interface, (bytes.fromhex('01 02 03'), 3))
+
+    def test_address_if_current_address_unknown(self):
+        # Arrange
+        self.assertIsNone(self.display.address_counter)
+
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'), address=80)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 83)
+
+    def test_address_if_change(self):
+        # Arrange
+        self.display.address_counter = 160
+
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'), address=80)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 83)
+
+        self.display._load_address_counter.assert_called_with(80, force_load=False)
+
+    def test_address_if_no_change(self):
+        # Arrange
+        self.display.address_counter = 80
+
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'), address=80)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 83)
+
+        self.display._load_address_counter.assert_called_with(80, force_load=False)
+
+    def test_restore_original_address_if_current_address_unknown(self):
+        # Arrange
+        self.display._read_address_counter = Mock(return_value=160)
+
+        self.assertIsNone(self.display.address_counter)
+
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'), restore_original_address=True)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 160)
+
+    def test_restore_original_address_if_current_address_known(self):
+        # Arrange
+        self.display._read_address_counter = Mock(return_value=160)
+
+        self.display.address_counter = 160
+
+        # Act
+        self.display._write(bytes.fromhex('01 02 03'), restore_original_address=True)
+
+        # Assert
+        self.assertEqual(self.display.address_counter, 160)
+
+        self.display._read_address_counter.assert_not_called()
 
 class EncodeAsciiCharacterTestCase(unittest.TestCase):
     def test_mapped_character(self):
