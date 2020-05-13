@@ -6,9 +6,10 @@ oec.controller
 import time
 import logging
 from coax import poll, poll_ack, load_control_register, PollAction, \
-                 KeystrokePollResponse, ReceiveTimeout, ReceiveError, ProtocolError
+                 KeystrokePollResponse, TerminalType, ReceiveTimeout, \
+                 ReceiveError, ProtocolError
 
-from .terminal import Terminal, read_terminal_ids
+from .terminal import Terminal, UnsupportedTerminalError, read_terminal_ids
 from .keyboard import Key
 from .session import SessionDisconnectedError
 
@@ -76,7 +77,11 @@ class Controller:
             return
 
         if not self.terminal:
-            self._handle_terminal_attached(poll_response)
+            try:
+                self._handle_terminal_attached(poll_response)
+            except UnsupportedTerminalError as error:
+                self.logger.error(f'Unsupported terminal: {error}')
+                return
 
         if poll_response:
             self._handle_poll_response(poll_response)
@@ -88,6 +93,9 @@ class Controller:
         (terminal_id, extended_id) = read_terminal_ids(self.interface)
 
         self.logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
+
+        if terminal_id.type != TerminalType.CUT:
+            raise UnsupportedTerminalError('Only CUT type terminals are supported')
 
         # Get the keymap.
         keymap = self.get_keymap(terminal_id, extended_id)

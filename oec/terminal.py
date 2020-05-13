@@ -93,3 +93,6 @@ class Terminal:
                           cursor_blink=self.display.cursor_blink)
 
         return control
+
+class UnsupportedTerminalError(Exception):
+    """Unsupported terminal."""

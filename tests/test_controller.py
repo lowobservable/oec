@@ -10,7 +10,8 @@ from oec.session import SessionDisconnectedError
 from oec.keyboard import KeyboardModifiers, Key
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 
-TERMINAL_IDS = (TerminalId(0b11110100), 'c1348300')
+CUT_TERMINAL_IDS = (TerminalId(0b11110100), 'c1348300')
+DFT_TERMINAL_IDS = (TerminalId(0b00000001), None)
 
 class RunLoopTestCase(unittest.TestCase):
     def setUp(self):
@@ -20,6 +21,8 @@ class RunLoopTestCase(unittest.TestCase):
         self.create_session_mock = Mock(return_value=self.session_mock)
 
         self.controller = Controller(self.interface, lambda terminal_id, extended_id: KEYMAP_3278_2, self.create_session_mock)
+
+        self.controller.logger = Mock()
 
         self.controller.connected_poll_period = 1
 
@@ -35,7 +38,7 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.read_terminal_ids_mock = patcher.start()
 
-        self.read_terminal_ids_mock.return_value = TERMINAL_IDS
+        self.read_terminal_ids_mock.return_value = CUT_TERMINAL_IDS
 
         patcher = patch('oec.controller.load_control_register')
 
@@ -79,6 +82,14 @@ class RunLoopTestCase(unittest.TestCase):
         self.assertIsNotNone(self.controller.session)
 
         self.controller.session.handle_host.assert_called()
+
+    def test_unsupported_terminal_attached(self):
+        self.read_terminal_ids_mock.return_value = DFT_TERMINAL_IDS
+
+        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)
+
+        self.assertIsNone(self.controller.terminal)
+        self.assertIsNone(self.controller.session)
 
     def test_keystroke(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), 0, True)

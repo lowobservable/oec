@@ -1,22 +1,31 @@
 # oec
 
-IBM 3270 terminal controller - an open replacement for the IBM 3174 Establishment Controller.
+IBM 3270 terminal controller - a replacement for the IBM 3174.
 
 ![IBM 3278 terminal and oec](.images/hero.jpg)
 
 ## Features
 
-This is a work in progress - as of now it only provides basic TN3270 and VT100 emulation.
+The goal of this project is to create an open replacement for the IBM 3174 Establishment Controller, specifically for users looking to connect a IBM 3270 type terminal to the Hercules emulator. It is a work in progress and is far from providing all the features of the 3174, but it does provide basic TN3270 and VT100 emulation.
 
-- [x] TN3270
-    - [x] Basic TN3270
-    - [ ] EAB
-    - [ ] TN3270E
-    - [ ] SSL/TLS
-    - [ ] Non-English character sets
-- [x] VT100
-- [ ] Connection menu
-- [ ] Multiple logical terminals
+  - [x] TN3270
+      - [x] Basic TN3270
+      - [ ] TN3270E
+      - [ ] EAB (Extended Attribute Buffer)
+      - [ ] SSL/TLS
+      - [ ] Non-English character sets
+  - [x] VT100
+  - [ ] Connection menu
+  - [ ] MLT (Multiple Logical Terminals)
+
+## Supported Terminals
+
+Only CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
+
+  * IBM 3278-2
+  * IBM 3483-V (InfoWindow II)
+
+You may have to modify the key mapping to support your specific terminal configuration.
 
 ## Usage
 
@@ -27,7 +36,7 @@ Then configure a Python virtual environment and install dependencies:
 ```
 python -m venv VIRTUALENV
 . VIRTUALENV/bin/activate
-pip install -r requirements.txt --no-deps
+pip install -r requirements.txt
 ```
 
 Assuming your interface is connected to `/dev/ttyACM0` and you want to connect to a TN3270 host named `mainframe`:
