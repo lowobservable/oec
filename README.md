@@ -6,7 +6,15 @@ IBM 3270 terminal controller - a replacement for the IBM 3174.
 
 ## Features
 
-The goal of this project is to create an open replacement for the IBM 3174 Establishment Controller, specifically for users looking to connect a IBM 3270 type terminal to the Hercules emulator. It is a work in progress and is far from providing all the features of the 3174, but it does provide basic TN3270 and VT100 emulation.
+This project aims to create an open replacement for the IBM 3174 Establishment
+Controller, specifically for users looking to connect an IBM 3270 type terminal
+to the Hercules emulator. For background on this project, IBM 3270 type
+terminals and controllers, see
+_[Building an IBM 3270 terminal controller](https://ajk.me/building-an-ibm-3270-terminal-controller)_.
+
+It is a work in progress and is far from providing all the features you might
+expect from a later model 3174, but it does provide basic TN3270 and VT100
+emulation.
 
   - [x] TN3270
       - [x] Basic TN3270
@@ -29,7 +37,7 @@ You may have to modify the key mapping to support your specific terminal configu
 
 ## Usage
 
-You will need to build a [interface](https://github.com/lowobservable/coax) and connect it to your computer.
+You will need to build an [interface](https://github.com/lowobservable/coax) and connect it to your computer.
 
 Then configure a Python virtual environment and install dependencies:
 
