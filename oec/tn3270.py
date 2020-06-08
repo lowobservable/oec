@@ -197,21 +197,8 @@ class TN3270Session(Session):
         self.operator_error = None
 
     def _map_attribute(self, attribute):
-        # NOTE: This mapping may not be correct and does not take into account
-        # lightpen detectable fields.
-        if attribute.hidden:
-            return 0xcc
-
-        if attribute.protected:
-            if attribute.intensified:
-                return 0xe8
-
-            return 0xe0
-
-        if attribute.intensified:
-            return 0xc8
-
-        return 0xc0
+        # Only map the protected and display bits - ignore numeric, skip and modified.
+        return 0xc0 | (attribute.value & 0x2c)
 
     def _map_character(self, byte):
         if byte == DUP:

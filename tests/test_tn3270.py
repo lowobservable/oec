@@ -58,7 +58,7 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.terminal.display.flush.assert_called()
 
-        self.assertEqual(self.terminal.display.buffer[:105], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0'))
+        self.assertEqual(self.terminal.display.buffer[:105], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0'))
         self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.buffer[105:]]))
 
         self.assertEqual(self.terminal.display.cursor_index, 8)
@@ -281,6 +281,12 @@ class MockAttribute:
         self.protected = protected
         self.intensified = intensified
         self.hidden = hidden
+
+    @property
+    def value(self):
+        display = 2 if self.intensified else 3 if self.hidden else 0
+
+        return (0x20 if self.protected else 0) | (display << 2)
 
 def _create_screen_cells(rows, columns):
     return [CharacterCell(0x00) for address in range(rows * columns)]
