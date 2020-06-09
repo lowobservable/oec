@@ -15,9 +15,9 @@ from .keyboard import Key, get_ebcdic_character_for_key
 AID_KEY_MAP = {
     Key.CLEAR: AID.CLEAR,
     Key.ENTER: AID.ENTER,
-    #Key.PA1: AID.PA1,
-    #Key.PA2: AID.PA2,
-    #Key.PA3: AID.PA3,
+    Key.PA1: AID.PA1,
+    Key.PA2: AID.PA2,
+    Key.PA3: AID.PA3,
     Key.PF1: AID.PF1,
     Key.PF2: AID.PF2,
     Key.PF3: AID.PF3,
@@ -111,7 +111,7 @@ class TN3270Session(Session):
                 self.emulator.tab()
             elif key == Key.BACKTAB:
                 self.emulator.tab(direction=-1)
-            elif key in [Key.NEWLINE, Key.FIELD_EXIT]:
+            elif key == Key.NEWLINE:
                 self.emulator.newline()
             elif key == Key.HOME:
                 self.emulator.home()

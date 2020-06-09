@@ -5,6 +5,9 @@ oec.keymap_3483
 
 from .keyboard import Key, Keymap
 
+# I have a 5250 keyboard for my 3483-V, this mapping is based on photographs
+# of the 3270 keyboard and may not be correct.
+
 KEYMAP_DEFAULT = {
     # Function Keys
     7: Key.PF1,
@@ -34,15 +37,15 @@ KEYMAP_DEFAULT = {
 
     # Control Keys
     5: Key.ATTN,
-    6: Key.BLANK_1,
-    4: Key.BLANK_2,
-    12: None, # ERASE_INPUT
-    3: Key.PRINT,
-    11: Key.HELP,
-    131: Key.BLANK_3,
-    10: Key.PLAY,
-    1: Key.SET_UP,
-    9: Key.RECORD,
+    6: Key.CLEAR,
+    4: Key.CURSOR_SELECT,
+    12: None, # Pause
+    3: Key.EXTEND_SELECT,
+    11: Key.ERASE_EOF,
+    131: Key.PRINT,
+    10: None, # Play
+    1: Key.PRINT,
+    9: Key.CTRL,
 
     # First Row
     14: Key.BACKTICK,
@@ -74,7 +77,7 @@ KEYMAP_DEFAULT = {
     77: Key.LOWER_P,
     84: Key.CENT,
     91: Key.BACKSLASH,
-    90: Key.FIELD_EXIT,
+    90: Key.NEWLINE,
 
     # Third Row
     20: Key.CAPS_LOCK,
@@ -114,36 +117,36 @@ KEYMAP_DEFAULT = {
     88: Key.ENTER,
 
     # Center
-    103: Key.BACKTAB,
-    110: Key.DUP,
-    111: Key.BLANK_4,
-    100: Key.NEWLINE,
+    103: Key.PA1,
+    110: Key.PA2,
+    111: Key.JUMP,
+    100: Key.BACKTAB,
     101: Key.INSERT,
     109: Key.DELETE,
 
     99: Key.UP,
     97: Key.LEFT,
-    98: None, # RULE
+    98: None, # Rule
     106: Key.RIGHT,
     96: Key.DOWN,
 
     # Number Pad
-    118: Key.NUMPAD_BLANK_1,
-    119: Key.NUMPAD_BLANK_2,
-    126: Key.NUMPAD_BLANK_3,
-    132: Key.NUMPAD_BLANK_4,
+    118: None, # Blank
+    119: None, # Blank
+    126: Key.COMMA,
+    132: Key.SPACE,
     108: Key.NUMPAD_SEVEN,
     117: Key.NUMPAD_EIGHT,
     125: Key.NUMPAD_NINE,
-    124: Key.NUMPAD_FIELD_MINUS,
+    124: Key.TAB,
     107: Key.NUMPAD_FOUR,
     115: Key.NUMPAD_FIVE,
     116: Key.NUMPAD_SIX,
-    123: Key.NUMPAD_BLANK_5,
+    123: Key.MINUS,
     105: Key.NUMPAD_ONE,
     114: Key.NUMPAD_TWO,
     122: Key.NUMPAD_THREE,
-    121: Key.NUMPAD_FIELD_PLUS,
+    121: Key.ENTER,
     112: Key.NUMPAD_ZERO,
     113: Key.NUMPAD_PERIOD
 }
@@ -152,8 +155,7 @@ KEYMAP_SHIFT = {
     **KEYMAP_DEFAULT,
 
     # Control Keys
-    5: Key.SYS_RQ,
-    12: Key.ERASE_INPUT,
+    10: None, # Copy
 
     # First Row
     14: Key.TILDE,
@@ -207,23 +209,30 @@ KEYMAP_SHIFT = {
     50: Key.UPPER_B,
     49: Key.UPPER_N,
     58: Key.UPPER_M,
-    65: Key.COMMA, # TODO: ???
-    73: Key.CENTER_PERIOD, # TODO: ???
+    65: Key.COMMA, # TODO: Confirm this mapping
+    73: Key.CENTER_PERIOD, # TODO: Confirm this mapping
     74: Key.QUESTION,
 
     # Center
-    99: Key.ROLL_UP,
-    96: Key.ROLL_DOWN
+    103: Key.DUP,
+    110: Key.FIELD_MARK
 }
 
 KEYMAP_ALT = {
     **KEYMAP_DEFAULT,
 
     # Control Keys
-    6: Key.CLEAR,
+    5: Key.SYS_RQ,
+    12: Key.ERASE_INPUT,
+    131: Key.IDENT,
+    10: Key.TEST,
 
     # Center
-    98: Key.HOME
+    111: Key.PA3,
+
+    97: Key.LEFT_2,
+    98: Key.HOME,
+    106: Key.RIGHT_2
 }
 
 KEYMAP = Keymap('3483', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, modifier_release=240)

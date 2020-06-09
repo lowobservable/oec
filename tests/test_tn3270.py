@@ -144,13 +144,6 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         # Assert
         self.session.emulator.newline.assert_called()
 
-    def test_field_exit(self):
-        # Act
-        self.session.handle_key(Key.FIELD_EXIT, KeyboardModifiers.NONE, None)
-
-        # Assert
-        self.session.emulator.newline.assert_called()
-
     def test_home(self):
         # Act
         self.session.handle_key(Key.HOME, KeyboardModifiers.NONE, None)

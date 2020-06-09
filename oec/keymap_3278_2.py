@@ -9,8 +9,8 @@ KEYMAP_DEFAULT = {
     # Control Keys
     80: Key.ATTN,
     81: Key.CURSOR_SELECT,
-    82: Key.BLANK_1,
-    83: Key.BLANK_2,
+    82: None, # Blank
+    83: None, # Blank
     84: Key.CURSOR_BLINK,
     85: Key.ERASE_EOF,
     86: Key.PRINT,
@@ -62,7 +62,7 @@ KEYMAP_DEFAULT = {
     126: Key.SEMICOLON,
     18: Key.SINGLE_QUOTE,
     15: Key.LEFT_BRACE,
-    8: Key.FIELD_EXIT,
+    8: Key.NEWLINE,
 
     # Fourth Row
     77: Key.LEFT_SHIFT,
@@ -88,7 +88,7 @@ KEYMAP_DEFAULT = {
     # Right
     95: Key.DUP,
     94: Key.FIELD_MARK,
-    12: Key.INSERT, # TODO: Confirm this mapping
+    12: Key.INSERT,
     13: Key.DELETE,
     14: Key.UP,
     19: Key.DOWN,

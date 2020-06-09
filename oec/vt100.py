@@ -22,7 +22,6 @@ VT100_KEY_MAP = {
 
     Key.NEWLINE: b'\r',
     Key.ENTER: b'\r',
-    Key.FIELD_EXIT: b'\r',
 
     Key.BACKSPACE: b'\b',
     Key.TAB: b'\t',
