@@ -4,13 +4,13 @@ IBM 3270 terminal controller - a replacement for the IBM 3174.
 
 ![IBM 3278 terminal and oec](.images/hero.jpg)
 
-## Features
-
 This project aims to create an open replacement for the IBM 3174 Establishment
 Controller, specifically for users looking to connect an IBM 3270 type terminal
 to the Hercules emulator. For background on this project, IBM 3270 type
 terminals and controllers, see
 _[Building an IBM 3270 terminal controller](https://ajk.me/building-an-ibm-3270-terminal-controller)_.
+
+## Features
 
 It is a work in progress and is far from providing all the features you might
 expect from a later model 3174, but it does provide basic TN3270 and VT100
@@ -39,11 +39,18 @@ You may have to modify the key mapping to support your specific terminal configu
 
 You will need to build an [interface](https://github.com/lowobservable/coax) and connect it to your computer.
 
-Then configure a Python virtual environment and install dependencies:
+You will need Python 3.8 installed.
+
+I'd recommend using a Python [virtual environment](https://docs.python.org/3/library/venv.html) to isolate oec from your system-wide packages:
 
 ```
-python -m venv VIRTUALENV
-. VIRTUALENV/bin/activate
+python3.8 -m venv VIRTUALENV
+source VIRTUALENV/bin/activate
+```
+
+Install dependencies using `pip`:
+
+```
 pip install -r requirements.txt
 ```
 
