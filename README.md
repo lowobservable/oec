@@ -6,9 +6,15 @@ IBM 3270 terminal controller - a replacement for the IBM 3174.
 
 This project aims to create an open replacement for the IBM 3174 Establishment
 Controller, specifically for users looking to connect an IBM 3270 type terminal
-to the Hercules emulator. For background on this project, IBM 3270 type
-terminals and controllers, see
+to the Hercules emulator.
+
+For background on this project, IBM 3270 type terminals and controllers, see
 _[Building an IBM 3270 terminal controller](https://ajk.me/building-an-ibm-3270-terminal-controller)_.
+
+If you are looking for a similar project for IBM 5250 (Twinax) type terminals, see
+inmbolmie's
+[5250_usb_converter](https://github.com/inmbolmie/5250_usb_converter)
+project.
 
 ## Features
 
