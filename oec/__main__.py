@@ -1,3 +1,4 @@
+import os
 import time
 import signal
 import logging
@@ -7,7 +8,15 @@ from coax import SerialInterface
 
 from .controller import Controller
 from .tn3270 import TN3270Session
-from .vt100 import VT100Session
+
+# VT100 emulation is not supported on Windows.
+is_vt100_available = False
+
+if os.name == 'posix':
+    from .vt100 import VT100Session
+
+    is_vt100_available = True
+
 from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from .keymap_3483 import KEYMAP as KEYMAP_3483
 
@@ -27,7 +36,7 @@ def _create_session(args, terminal):
     if args.emulator == 'tn3270':
         return TN3270Session(terminal, args.host, args.port)
 
-    if args.emulator == 'vt100':
+    if args.emulator == 'vt100' and is_vt100_available:
         host_command = [args.command, *args.command_args]
 
         return VT100Session(terminal, host_command)
@@ -64,12 +73,13 @@ def main():
     tn3270_parser.add_argument('host', help='Hostname')
     tn3270_parser.add_argument('port', nargs='?', default=23, type=int)
 
-    vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
-                                         help='VT100 emulator')
+    if is_vt100_available:
+        vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
+                                             help='VT100 emulator')
 
-    vt100_parser.add_argument('command', help='Host process')
-    vt100_parser.add_argument('command_args', nargs=argparse.REMAINDER,
-                              help='Host process arguments')
+        vt100_parser.add_argument('command', help='Host process')
+        vt100_parser.add_argument('command_args', nargs=argparse.REMAINDER,
+                                  help='Host process arguments')
 
     args = parser.parse_args()
 

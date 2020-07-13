@@ -72,6 +72,8 @@ If you want to use the VT100 emulator and run `/bin/sh` as the host process:
 python -m oec /dev/ttyACM0 vt100 /bin/sh -l
 ```
 
+VT100 emulation is not supported on Windows. It may work with Python on Cygwin, but I've not tested it.
+
 ## See Also
 
 * [coax](https://github.com/lowobservable/coax) - Tools for interfacing with IBM 3270 type terminals
