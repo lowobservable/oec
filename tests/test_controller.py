@@ -44,6 +44,12 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.load_control_register_mock = patcher.start()
 
+        patcher = patch('oec.controller.get_features')
+
+        self.get_features_mock = patcher.start()
+
+        self.get_features_mock.return_value = { }
+
         patcher = patch('oec.controller.time.perf_counter')
 
         self.perf_counter_mock = patcher.start()

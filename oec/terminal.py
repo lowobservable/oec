@@ -59,10 +59,11 @@ def read_terminal_ids(interface, extended_id_retry_attempts=3):
 class Terminal:
     """Terminal information and devices."""
 
-    def __init__(self, interface, terminal_id, extended_id, keymap):
+    def __init__(self, interface, terminal_id, extended_id, features, keymap):
         self.interface = interface
         self.terminal_id = terminal_id
         self.extended_id = extended_id
+        self.features = features
 
         dimensions = get_dimensions(self.terminal_id, self.extended_id)
 

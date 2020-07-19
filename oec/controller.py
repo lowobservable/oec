@@ -5,7 +5,7 @@ oec.controller
 
 import time
 import logging
-from coax import poll, poll_ack, load_control_register, PollAction, \
+from coax import poll, poll_ack, load_control_register, get_features, PollAction, \
                  KeystrokePollResponse, TerminalType, ReceiveTimeout, \
                  ReceiveError, ProtocolError
 
@@ -97,11 +97,17 @@ class Controller:
         if terminal_id.type != TerminalType.CUT:
             raise UnsupportedTerminalError('Only CUT type terminals are supported')
 
+        # Get the terminal features.
+        features = get_features(self.interface)
+
+        self.logger.info(f'Features = {features}')
+
         # Get the keymap.
         keymap = self.get_keymap(terminal_id, extended_id)
 
         # Initialize the terminal.
-        self.terminal = Terminal(self.interface, terminal_id, extended_id, keymap)
+        self.terminal = Terminal(self.interface, terminal_id, extended_id,
+                                 features, keymap)
 
         (rows, columns) = self.terminal.display.dimensions
         keymap_name = self.terminal.keyboard.keymap.name
