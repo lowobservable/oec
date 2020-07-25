@@ -125,6 +125,10 @@ class TN3270Session(Session):
                 self.emulator.aid(aid)
 
                 self.waiting_on_host = True
+            elif key == Key.RESET:
+                # TODO: there is more here that RESET should be responsible
+                # for
+                pass
             elif key == Key.BACKSPACE:
                 self.emulator.backspace()
             elif key == Key.TAB:
