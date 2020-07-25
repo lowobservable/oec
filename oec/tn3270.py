@@ -91,6 +91,9 @@ class TN3270Session(Session):
 
         self.waiting_on_host = False
 
+        # TODO: is this correct?
+        self.operator_error = None
+
         self._apply()
         self._flush()
 
@@ -99,12 +102,29 @@ class TN3270Session(Session):
     def handle_key(self, key, keyboard_modifiers, scan_code):
         aid = AID_KEY_MAP.get(key)
 
+        if self.operator_error is not None:
+            # keyboard remains locked unless you do one of the valid keys
+            # for unlocking
+            if key not in [Key.RESET, Key.UP, ...]:
+                return
+
+            self.operator_error = None
+
+            # let the action play out but lets refresh the status line
+            # in case the status should change to something like "waiting
+            # on host"...
+            self._apply()
+            self._flush()
+
+        # TODO: something like this as well?
+        if self.waiting_on_host:
+            return
+
         try:
             if aid is not None:
                 self.emulator.aid(aid)
 
                 self.waiting_on_host = True
-            #elif key == Key.RESET:
             elif key == Key.BACKSPACE:
                 self.emulator.backspace()
             elif key == Key.TAB:
@@ -192,9 +212,6 @@ class TN3270Session(Session):
 
         # TODO: see note in VT100 about forcing sync
         self.terminal.display.move_cursor(index=self.emulator.cursor_address)
-
-        # TODO: eek, is this the correct place to do this?
-        self.operator_error = None
 
     def _map_attribute(self, attribute):
         # Only map the protected and display bits - ignore numeric, skip and modified.
