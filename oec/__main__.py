@@ -52,7 +52,7 @@ def _create_interface(args):
 
 def _create_session(args, terminal):
     if args.emulator == 'tn3270':
-        return TN3270Session(terminal, args.host, args.port)
+        return TN3270Session(terminal, args.host, args.port, args.extended_data_stream)
 
     if args.emulator == 'vt100' and is_vt100_available:
         host_command = [args.command, *args.command_args]
@@ -90,6 +90,10 @@ def main():
 
     tn3270_parser.add_argument('host', help='Hostname')
     tn3270_parser.add_argument('port', nargs='?', default=23, type=int)
+
+    tn3270_parser.add_argument('--disable-eds', action='store_false',
+                               dest='extended_data_stream',
+                               help='Disable extended data stream support')
 
     if is_vt100_available:
         vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',

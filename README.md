@@ -24,10 +24,9 @@ emulation.
 
   - [x] TN3270
       - [x] Basic TN3270
+      - [ ] Extended Data Stream
       - [ ] TN3270E
-      - [ ] EAB (Extended Attribute Buffer)
       - [ ] SSL/TLS
-      - [ ] Non-English character sets
   - [x] VT100
   - [ ] Connection menu
   - [ ] MLT (Multiple Logical Terminals)

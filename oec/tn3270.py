@@ -47,12 +47,13 @@ AID_KEY_MAP = {
 class TN3270Session(Session):
     """TN3270 session."""
 
-    def __init__(self, terminal, host, port):
+    def __init__(self, terminal, host, port, extended_data_stream=True):
         self.logger = logging.getLogger(__name__)
 
         self.terminal = terminal
         self.host = host
         self.port = port
+        self.extended_data_stream = extended_data_stream
 
         self.telnet = None
         self.emulator = None
@@ -154,6 +155,9 @@ class TN3270Session(Session):
     def _connect_host(self):
         terminal_type = f'IBM-3278-{self.terminal.terminal_id.model}'
 
+        if self.extended_data_stream:
+            terminal_type += '-E'
+
         self.telnet = Telnet(terminal_type)
 
         self.telnet.open(self.host, self.port)
@@ -170,9 +174,9 @@ class TN3270Session(Session):
             byte = 0x00
 
             if isinstance(cell, AttributeCell):
-                byte = self._map_attribute(cell.attribute)
+                byte = self._map_attribute(cell)
             elif isinstance(cell, CharacterCell):
-                byte = self._map_character(cell.byte)
+                byte = self._map_character(cell)
 
             self.terminal.display.buffered_write(byte, index=address)
 
@@ -196,16 +200,23 @@ class TN3270Session(Session):
         # TODO: eek, is this the correct place to do this?
         self.operator_error = None
 
-    def _map_attribute(self, attribute):
+    def _map_attribute(self, cell):
         # Only map the protected and display bits - ignore numeric, skip and modified.
-        return 0xc0 | (attribute.value & 0x2c)
+        return 0xc0 | (cell.attribute.value & 0x2c)
 
-    def _map_character(self, byte):
+    def _map_character(self, cell):
+        byte = cell.byte
+
         if byte == DUP:
             return encode_ascii_character(ord('*'))
 
         if byte == FM:
             return encode_ascii_character(ord(';'))
+
+        # TODO: Temporary workaround to show empty reverse video fields until EAB
+        # support is added.
+        if byte == 0x40 and cell.formatting is not None and cell.formatting.reverse:
+            return encode_ascii_character(ord('#'))
 
         return encode_ebcdic_character(byte)
 
