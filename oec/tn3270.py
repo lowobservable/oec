@@ -81,6 +81,9 @@ class TN3270Session(Session):
 
         self.emulator = None
 
+    def fileno(self):
+        return self.emulator.stream.socket.fileno()
+
     def handle_host(self):
         try:
             if not self.emulator.update(timeout=0):

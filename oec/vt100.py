@@ -4,7 +4,6 @@ oec.vt100
 """
 
 import os
-from select import select
 import logging
 from ptyprocess import PtyProcess
 import pyte
@@ -112,20 +111,23 @@ class VT100Session(Session):
         if self.host_process:
             self._terminate_host_process()
 
+    def fileno(self):
+        return self.host_process.fileno()
+
     def handle_host(self):
         data = None
 
         try:
-            if self.host_process not in select([self.host_process], [], [], 0)[0]:
-                return False
-
             data = self.host_process.read()
         except EOFError:
             self.host_process = None
 
             raise SessionDisconnectedError
 
-        self._handle_host_output(data)
+        self.vt100_stream.feed(data)
+
+        self._apply()
+        self._flush()
 
         return True
 
@@ -181,15 +183,6 @@ class VT100Session(Session):
             self.logger.debug('Host process terminated')
 
         self.host_process = None
-
-    def _handle_host_output(self, data):
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug(f'Host process output: {data}')
-
-        self.vt100_stream.feed(data)
-
-        self._apply()
-        self._flush()
 
     def _apply(self):
         for row in self.vt100_screen.dirty:

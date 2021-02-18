@@ -5,7 +5,7 @@ import context
 
 from oec.display import Dimensions
 from oec.keyboard import Key, KeyboardModifiers
-from oec.vt100 import VT100Session, select
+from oec.vt100 import VT100Session
 
 class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
@@ -16,12 +16,6 @@ class SessionHandleHostTestCase(unittest.TestCase):
         self.session = VT100Session(self.terminal, None)
 
         self.session.host_process = Mock()
-
-        patcher = patch('oec.vt100.select')
-
-        select_mock = patcher.start()
-
-        select_mock.return_value = [[self.session.host_process]]
 
         self.addCleanup(patch.stopall)
 

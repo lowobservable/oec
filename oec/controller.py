@@ -5,6 +5,7 @@ oec.controller
 
 import time
 import logging
+from select import select
 from coax import poll, poll_ack, load_control_register, get_features, PollAction, \
                  KeystrokePollResponse, TerminalType, ReceiveTimeout, \
                  ReceiveError, ProtocolError
@@ -56,11 +57,17 @@ class Controller:
         self.running = False
 
     def _run_loop(self):
-        if self.session:
-            try:
-                self.session.handle_host()
-            except SessionDisconnectedError:
-                self._handle_session_disconnected()
+        poll_delay = self._calculate_poll_delay(time.perf_counter())
+
+        # If POLLing is delayed, handle the host output, otherwise just sleep.
+        if poll_delay > 0:
+            if self.session:
+                try:
+                    self._update_session(poll_delay)
+                except SessionDisconnectedError:
+                    self._handle_session_disconnected()
+            else:
+                time.sleep(poll_delay)
 
         try:
             poll_response = self._poll()
@@ -150,6 +157,17 @@ class Controller:
 
         self.session = None
 
+    def _update_session(self, duration):
+        while duration > 0:
+            start_time = time.perf_counter()
+
+            if self.session not in select([self.session], [], [], duration)[0]:
+                break
+
+            self.session.handle_host()
+
+            duration -= (time.perf_counter() - start_time)
+
     def _handle_poll_response(self, poll_response):
         if isinstance(poll_response, KeystrokePollResponse):
             self._handle_keystroke_poll_response(poll_response)
@@ -184,11 +202,6 @@ class Controller:
             self.session.handle_key(key, modifiers, scan_code)
 
     def _poll(self):
-        delay = self._calculate_poll_delay(time.perf_counter())
-
-        if delay > 0:
-            time.sleep(delay)
-
         self.last_poll_time = time.perf_counter()
 
         poll_action = self.terminal.get_poll_action() if self.terminal else PollAction.NONE
@@ -219,7 +232,7 @@ class Controller:
         else:
             period = self.disconnected_poll_period
 
-        return (self.last_poll_time + period) - current_time
+        return max((self.last_poll_time + period) - current_time, 0)
 
     def _load_control_register(self):
         load_control_register(self.interface, self.terminal.get_control_register())

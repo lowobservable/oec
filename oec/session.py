@@ -5,6 +5,9 @@ class Session:
     def terminate(self):
         raise NotImplementedError
 
+    def fileno(self):
+        raise NotImplementedError
+
     def handle_host(self):
         raise NotImplementedError
 
