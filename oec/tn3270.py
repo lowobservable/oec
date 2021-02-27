@@ -221,6 +221,10 @@ class TN3270Session(Session):
         if byte == 0x40 and cell.formatting is not None and cell.formatting.reverse:
             return encode_ascii_character(ord('#'))
 
+        # TODO: Temporary workaround until character set support is added.
+        if cell.character_set is not None:
+            return encode_ascii_character(ord('ß'))
+
         return encode_ebcdic_character(byte)
 
     def _format_message_area(self):
