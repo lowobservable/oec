@@ -1,3 +1,4 @@
+import selectors
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
 from coax import PollAction, PowerOnResetCompletePollResponse, KeystrokePollResponse, ReceiveTimeout
@@ -25,6 +26,8 @@ class RunLoopTestCase(unittest.TestCase):
         self.controller.logger = Mock()
 
         self.controller.connected_poll_period = 1
+
+        self.controller.session_selector = Mock()
 
         self.controller._update_session = Mock()
 
@@ -257,13 +260,11 @@ class UpdateSessionTestCase(unittest.TestCase):
 
         self.controller.session = Mock()
 
+        self.controller.session_selector = Mock()
+
         patcher = patch('oec.controller.time.perf_counter')
 
         self.perf_counter_mock = patcher.start()
-
-        patcher = patch('oec.controller.select')
-
-        self.select_mock = patcher.start()
 
     def test_zero_duration(self):
         # Act
@@ -272,11 +273,11 @@ class UpdateSessionTestCase(unittest.TestCase):
         # Assert
         self.controller.session.handle_host.assert_not_called()
 
-        self.select_mock.assert_not_called()
+        self.controller.session_selector.select.assert_not_called()
 
     def test_select_timeout(self):
         # Arrange
-        self.select_mock.return_value = ([], [], [])
+        self.controller.session_selector.select.return_value = []
 
         # Act
         self.controller._update_session(1)
@@ -284,13 +285,15 @@ class UpdateSessionTestCase(unittest.TestCase):
         # Assert
         self.controller.session.handle_host.assert_not_called()
 
-        self.select_mock.assert_called_once()
+        self.controller.session_selector.select.assert_called_once()
 
     def test_select_available(self):
         # Arrange
         self.perf_counter_mock.side_effect = [0, 0.75, 0.75]
 
-        self.select_mock.side_effect = [([self.controller.session], [], []), ([], [], [])]
+        selector_key = Mock(fileobj=self.controller.session)
+
+        self.controller.session_selector.select.side_effect = [[(selector_key, selectors.EVENT_READ)], []]
 
         # Act
         self.controller._update_session(1)
@@ -298,7 +301,9 @@ class UpdateSessionTestCase(unittest.TestCase):
         # Assert
         self.controller.session.handle_host.assert_called_once()
 
-        self.assertEqual(self.select_mock.call_count, 2)
+        self.assertEqual(self.controller.session_selector.select.call_count, 2)
 
-        self.assertEqual(self.select_mock.call_args_list[0][0][3], 1)
-        self.assertEqual(self.select_mock.call_args_list[1][0][3], 0.25)
+        call_args_list = self.controller.session_selector.select.call_args_list
+
+        self.assertEqual(call_args_list[0][0][0], 1)
+        self.assertEqual(call_args_list[1][0][0], 0.25)

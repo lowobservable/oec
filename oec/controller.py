@@ -5,7 +5,7 @@ oec.controller
 
 import time
 import logging
-from select import select
+import selectors
 from coax import poll, poll_ack, load_control_register, get_features, PollAction, \
                  KeystrokePollResponse, TerminalType, ReceiveTimeout, \
                  ReceiveError, ProtocolError
@@ -29,6 +29,8 @@ class Controller:
         self.terminal = None
         self.session = None
 
+        self.session_selector = None
+
         # Target time between POLL commands in seconds when a terminal is connected or
         # no terminal is connected.
         #
@@ -45,10 +47,16 @@ class Controller:
         """Run the controller."""
         self.running = True
 
+        self.session_selector = selectors.DefaultSelector()
+
         while self.running:
             self._run_loop()
 
         self._terminate_session()
+
+        self.session_selector.close()
+
+        self.session_selector = None
 
         if self.terminal:
             self.terminal = None
@@ -139,7 +147,7 @@ class Controller:
     def _handle_session_disconnected(self):
         self.logger.info('Session disconnected')
 
-        self.session = None
+        self._terminate_session()
 
         # Restart the session.
         self._start_session()
@@ -149,9 +157,13 @@ class Controller:
 
         self.session.start()
 
+        self.session_selector.register(self.session, selectors.EVENT_READ)
+
     def _terminate_session(self):
         if not self.session:
             return
+
+        self.session_selector.unregister(self.session)
 
         self.session.terminate()
 
@@ -161,10 +173,15 @@ class Controller:
         while duration > 0:
             start_time = time.perf_counter()
 
-            if self.session not in select([self.session], [], [], duration)[0]:
+            selected = self.session_selector.select(duration)
+
+            if not selected:
                 break
 
-            self.session.handle_host()
+            for (key, events) in selected:
+                session = key.fileobj
+
+                session.handle_host()
 
             duration -= (time.perf_counter() - start_time)
 
