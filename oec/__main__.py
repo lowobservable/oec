@@ -39,8 +39,10 @@ def _create_interface(args):
         serial.reset_input_buffer()
         serial.reset_output_buffer()
 
-        # Allow the interface firmware time to start.
-        time.sleep(3)
+        # Allow the interface firmware time to start, this is only required for the
+        # original Arduino Mega based interface.
+        if 'COAX_FAST_START' not in os.environ:
+            time.sleep(3)
 
         interface = SerialInterface(serial)
 
