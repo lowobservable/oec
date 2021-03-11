@@ -46,9 +46,7 @@ def _create_interface(args):
 
         interface = SerialInterface(serial)
 
-        firmware_version = interface.reset()
-
-        print(f'Interface firmware version {firmware_version}')
+        interface.reset()
 
         yield interface
 

@@ -1,5 +1,5 @@
 ptyprocess==0.7.0
-pycoax==0.6.0
+pycoax==0.7.0
 pyserial==3.5
 pyte==0.8.0
 pytn3270==0.9.1
