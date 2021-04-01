@@ -11,11 +11,6 @@ to the Hercules emulator.
 For background on this project, IBM 3270 type terminals and controllers, see
 _[Building an IBM 3270 terminal controller](https://ajk.me/building-an-ibm-3270-terminal-controller)_.
 
-If you are looking for a similar project for IBM 5250 (Twinax) type terminals, see
-inmbolmie's
-[5250_usb_converter](https://github.com/inmbolmie/5250_usb_converter)
-project.
-
 ## Features
 
 It is a work in progress and is far from providing all the features you might
@@ -28,23 +23,28 @@ emulation.
       - [ ] TN3270E
       - [ ] SSL/TLS
   - [x] VT100
-  - [ ] Connection menu
+  - [ ] Connection Menu
   - [ ] MLT (Multiple Logical Terminals)
 
 ## Supported Terminals
 
-Only CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
+Only directly attached CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
 
   * IBM 3278-2
+  * IBM 3472
   * IBM 3483-V (InfoWindow II)
 
 You may have to modify the key mapping to support your specific terminal configuration.
 
 ## Usage
 
-You will need to build an [interface](https://github.com/lowobservable/coax) and connect it to your computer.
+You will need to
+[build](https://github.com/lowobservable/coax#hardware)
+or
+[buy](https://www.tindie.com/products/approachware/3270-usb-interface-ibm/)
+a compatible interface.
 
-You will need Python 3.8 installed.
+You will need Python 3.8, or above, installed.
 
 I'd recommend using a Python [virtual environment](https://docs.python.org/3/library/venv.html) to isolate oec from your system-wide packages:
 
@@ -75,5 +75,10 @@ VT100 emulation is not supported on Windows. It may work with Python on Cygwin, 
 
 ## See Also
 
-* [coax](https://github.com/lowobservable/coax) - Tools for interfacing with IBM 3270 type terminals
+* [coax](https://github.com/lowobservable/coax) - Tools for connecting to real IBM 3270 type terminals
 * [pytn3270](https://github.com/lowobservable/pytn3270) - Python TN3270 library
+
+If you are looking for a similar project for IBM 5250 (Twinax) type terminals, see
+inmbolmie's
+[5250_usb_converter](https://github.com/inmbolmie/5250_usb_converter)
+project.
