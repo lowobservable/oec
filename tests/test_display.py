@@ -11,7 +11,7 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
 
@@ -58,40 +58,57 @@ class DisplayBufferedWriteTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, Dimensions(24, 80), None)
 
-    def test(self):
+    def test_with_no_eab(self):
         # Act
-        self.display.buffered_write(0x01, index=15)
-        self.display.buffered_write(0x02, index=97)
+        self.display.buffered_write(0x01, 0x00, index=15)
+        self.display.buffered_write(0x02, 0x00, index=97)
+        self.display.buffered_write(0x00, 0x01, index=98)
 
         # Assert
-        self.assertEqual(self.display.buffer[15], 0x01)
-        self.assertEqual(self.display.buffer[97], 0x02)
+        self.assertEqual(self.display.regen_buffer[15], 0x01)
+        self.assertEqual(self.display.regen_buffer[97], 0x02)
+        self.assertEqual(self.display.eab_buffer[98], 0x00)
         self.assertSequenceEqual(self.display.dirty, [15, 97])
+
+    def test_with_eab(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        # Act
+        self.display.buffered_write(0x01, 0x00, index=15)
+        self.display.buffered_write(0x02, 0x00, index=97)
+        self.display.buffered_write(0x00, 0x01, index=98)
+
+        # Assert
+        self.assertEqual(self.display.regen_buffer[15], 0x01)
+        self.assertEqual(self.display.regen_buffer[97], 0x02)
+        self.assertEqual(self.display.eab_buffer[98], 0x01)
+        self.assertSequenceEqual(self.display.dirty, [15, 97, 98])
 
     def test_with_row_and_column(self):
         # Act
-        self.display.buffered_write(0x01, row=0, column=15)
-        self.display.buffered_write(0x02, row=1, column=17)
+        self.display.buffered_write(0x01, 0x00, row=0, column=15)
+        self.display.buffered_write(0x02, 0x00, row=1, column=17)
 
         # Assert
-        self.assertEqual(self.display.buffer[15], 0x01)
-        self.assertEqual(self.display.buffer[97], 0x02)
+        self.assertEqual(self.display.regen_buffer[15], 0x01)
+        self.assertEqual(self.display.regen_buffer[97], 0x02)
         self.assertSequenceEqual(self.display.dirty, [15, 97])
 
     def test_change(self):
-        self.assertTrue(self.display.buffered_write(0x01, index=0))
-        self.assertTrue(self.display.buffered_write(0x02, index=0))
+        self.assertTrue(self.display.buffered_write(0x01, 0x00, index=0))
+        self.assertTrue(self.display.buffered_write(0x02, 0x00, index=0))
 
-        self.assertEqual(self.display.buffer[0], 0x02)
+        self.assertEqual(self.display.regen_buffer[0], 0x02)
         self.assertSequenceEqual(self.display.dirty, [0])
 
     def test_no_change(self):
-        self.assertTrue(self.display.buffered_write(0x01, index=0))
-        self.assertFalse(self.display.buffered_write(0x01, index=0))
+        self.assertTrue(self.display.buffered_write(0x01, 0x00, index=0))
+        self.assertFalse(self.display.buffered_write(0x01, 0x00, index=0))
 
-        self.assertEqual(self.display.buffer[0], 0x01)
+        self.assertEqual(self.display.regen_buffer[0], 0x01)
         self.assertSequenceEqual(self.display.dirty, [0])
 
 class DisplayFlushTestCase(unittest.TestCase):
@@ -100,7 +117,7 @@ class DisplayFlushTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         self.display._flush_range = Mock()
 
@@ -111,11 +128,12 @@ class DisplayFlushTestCase(unittest.TestCase):
         # Assert
         self.display._flush_range.assert_not_called()
 
-    def test_single_range(self):
+    def test_single_range_with_no_eab(self):
         # Arrange
-        self.display.buffered_write(0x01, index=0)
-        self.display.buffered_write(0x02, index=1)
-        self.display.buffered_write(0x03, index=2)
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x00, index=2)
+        self.display.buffered_write(0x00, 0x01, index=3)
 
         # Act
         self.display.flush()
@@ -123,14 +141,32 @@ class DisplayFlushTestCase(unittest.TestCase):
         # Assert
         self.display._flush_range.assert_called_with(0, 2)
 
-    def test_multiple_ranges(self):
+    def test_single_range_with_eab(self):
         # Arrange
-        self.display.buffered_write(0x01, index=0)
-        self.display.buffered_write(0x02, index=1)
-        self.display.buffered_write(0x03, index=2)
-        self.display.buffered_write(0x05, index=30)
-        self.display.buffered_write(0x06, index=31)
-        self.display.buffered_write(0x04, index=20)
+        self.display.eab_address = 7
+
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x00, index=2)
+        self.display.buffered_write(0x00, 0x01, index=3)
+
+        # Act
+        self.display.flush()
+
+        # Assert
+        self.display._flush_range.assert_called_with(0, 3)
+
+    def test_multiple_ranges_with_no_eab(self):
+        # Arrange
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x01, index=2)
+        self.display.buffered_write(0x00, 0x02, index=3)
+        self.display.buffered_write(0x05, 0x00, index=30)
+        self.display.buffered_write(0x06, 0x00, index=31)
+        self.display.buffered_write(0x00, 0x05, index=32)
+        self.display.buffered_write(0x04, 0x03, index=20)
+        self.display.buffered_write(0x00, 0x04, index=21)
 
         # Act
         self.display.flush()
@@ -138,13 +174,33 @@ class DisplayFlushTestCase(unittest.TestCase):
         # Assert
         self.display._flush_range.assert_called_with(0, 31)
 
+    def test_multiple_ranges_with_no_eab(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x01, index=2)
+        self.display.buffered_write(0x00, 0x02, index=3)
+        self.display.buffered_write(0x05, 0x00, index=30)
+        self.display.buffered_write(0x06, 0x00, index=31)
+        self.display.buffered_write(0x00, 0x05, index=32)
+        self.display.buffered_write(0x04, 0x03, index=20)
+        self.display.buffered_write(0x00, 0x04, index=21)
+
+        # Act
+        self.display.flush()
+
+        # Assert
+        self.display._flush_range.assert_called_with(0, 32)
+
 class DisplayClearTestCase(unittest.TestCase):
     def setUp(self):
         self.interface = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
         self.display._write = Mock(wraps=self.display._write)
@@ -161,40 +217,90 @@ class DisplayClearTestCase(unittest.TestCase):
 
         self.write_data_mock = patcher.start()
 
+        patcher = patch('oec.display.eab_write_alternate')
+
+        self.eab_write_alternate_mock = patcher.start()
+
         self.addCleanup(patch.stopall)
 
-    def test_excluding_status_line(self):
+    def test_excluding_status_line_with_no_eab(self):
         # Arrange
-        self.display.buffered_write(0x01, index=0)
+        self.display.buffered_write(0x01, 0x01, index=0)
 
-        self.assertEqual(self.display.buffer[0], 0x01)
+        self.assertEqual(self.display.regen_buffer[0], 0x01)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
         self.assertTrue(self.display.dirty)
 
         # Act
         self.display.clear(clear_status_line=False)
 
         # Assert
-        self.display._write.assert_called_with((b'\x00', 1920), address=80)
+        self.display._write.assert_called_with((b'\x00', 1920), None, address=80)
         self.display._load_address_counter.assert_called_with(80, True)
 
-        self.assertEqual(self.display.buffer[0], 0x00)
+        self.assertEqual(self.display.regen_buffer[0], 0x00)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
         self.assertFalse(self.display.dirty)
 
-    def test_including_status_line(self):
+    def test_excluding_status_line_with_eab(self):
         # Arrange
-        self.display.buffered_write(0x01, index=0)
+        self.display.eab_address = 7
 
-        self.assertEqual(self.display.buffer[0], 0x01)
+        self.display.buffered_write(0x01, 0x01, index=0)
+
+        self.assertEqual(self.display.regen_buffer[0], 0x01)
+        self.assertEqual(self.display.eab_buffer[0], 0x01)
+        self.assertTrue(self.display.dirty)
+
+        # Act
+        self.display.clear(clear_status_line=False)
+
+        # Assert
+        self.display._write.assert_called_with((b'\x00', 1920), (b'\x00', 1920), address=80)
+        self.display._load_address_counter.assert_called_with(80, True)
+
+        self.assertEqual(self.display.regen_buffer[0], 0x00)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
+        self.assertFalse(self.display.dirty)
+
+    def test_including_status_line_with_no_eab(self):
+        # Arrange
+        self.display.buffered_write(0x01, 0x01, index=0)
+
+        self.assertEqual(self.display.regen_buffer[0], 0x01)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
         self.assertTrue(self.display.dirty)
 
         # Act
         self.display.clear(clear_status_line=True)
 
         # Assert
-        self.display._write.assert_called_with((b'\x00', 2000), address=0)
+        self.display._write.assert_called_with((b'\x00', 2000), None, address=0)
         self.display._load_address_counter.assert_called_with(80, True)
 
-        self.assertEqual(self.display.buffer[0], 0x00)
+        self.assertEqual(self.display.regen_buffer[0], 0x00)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
+        self.assertFalse(self.display.dirty)
+
+    def test_including_status_line_with_eab(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        self.display.buffered_write(0x01, 0x01, index=0)
+
+        self.assertEqual(self.display.regen_buffer[0], 0x01)
+        self.assertEqual(self.display.eab_buffer[0], 0x01)
+        self.assertTrue(self.display.dirty)
+
+        # Act
+        self.display.clear(clear_status_line=True)
+
+        # Assert
+        self.display._write.assert_called_with((b'\x00', 2000), (b'\x00', 2000), address=0)
+        self.display._load_address_counter.assert_called_with(80, True)
+
+        self.assertEqual(self.display.regen_buffer[0], 0x00)
+        self.assertEqual(self.display.eab_buffer[0], 0x00)
         self.assertFalse(self.display.dirty)
 
 class DisplayFlushRangeTestCase(unittest.TestCase):
@@ -203,7 +309,7 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         self.display._write = Mock(wraps=self.display._write)
 
@@ -225,15 +331,15 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         # Arrange
         self.display.move_cursor(index=0)
 
-        self.display.buffered_write(0x01, index=0)
-        self.display.buffered_write(0x02, index=1)
-        self.display.buffered_write(0x03, index=2)
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x00, index=2)
 
         # Act
         self.display.flush()
 
         # Assert
-        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=80)
+        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), None, address=80)
 
         self.assertEqual(self.display.address_counter, 83)
         self.assertFalse(self.display.dirty)
@@ -242,15 +348,15 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
         # Arrange
         self.display.move_cursor(index=70)
 
-        self.display.buffered_write(0x01, index=0)
-        self.display.buffered_write(0x02, index=1)
-        self.display.buffered_write(0x03, index=2)
+        self.display.buffered_write(0x01, 0x00, index=0)
+        self.display.buffered_write(0x02, 0x00, index=1)
+        self.display.buffered_write(0x03, 0x00, index=2)
 
         # Act
         self.display.flush()
 
         # Assert
-        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), address=80)
+        self.display._write.assert_called_with(bytes.fromhex('01 02 03'), None, address=80)
 
         self.assertEqual(self.display.address_counter, 83)
         self.assertFalse(self.display.dirty)
@@ -261,7 +367,7 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         patcher = patch('oec.display.load_address_counter_hi')
 
@@ -369,7 +475,7 @@ class DisplayWriteTestCase(unittest.TestCase):
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions)
+        self.display = Display(self.interface, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
 
@@ -385,32 +491,84 @@ class DisplayWriteTestCase(unittest.TestCase):
 
         self.write_data_mock = patcher.start()
 
+        patcher = patch('oec.display.eab_write_alternate')
+
+        self.eab_write_alternate_mock = patcher.start()
+
         self.addCleanup(patch.stopall)
 
-    def test(self):
+    def test_with_no_eab_data(self):
         # Act
-        self.display._write(bytes.fromhex('01 02 03'))
+        self.display._write(bytes.fromhex('01 02 03'), None)
 
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.write_data_mock.assert_called_with(self.interface, bytes.fromhex('01 02 03'))
+        self.write_data_mock.assert_called_with(self.interface, bytes.fromhex('01 02 03'), jumbo_write_strategy=None)
 
-    def test_repeat(self):
+    def test_with_eab_data(self):
+        # Arrange
+        self.display.eab_address = 7
+
         # Act
-        self.display._write((bytes.fromhex('01 02 03'), 3))
+        self.display._write(bytes.fromhex('01 02 03'), bytes.fromhex('04 05 06'))
 
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.write_data_mock.assert_called_with(self.interface, (bytes.fromhex('01 02 03'), 3))
+        self.eab_write_alternate_mock.assert_called_with(self.interface, 7, bytes.fromhex('01 04 02 05 03 06'), jumbo_write_strategy=None)
+
+    def test_repeat_with_no_eab_data(self):
+        # Act
+        self.display._write((bytes.fromhex('01 02 03'), 3), None)
+
+        # Assert
+        self.assertIsNone(self.display.address_counter)
+
+        self.write_data_mock.assert_called_with(self.interface, (bytes.fromhex('01 02 03'), 3), jumbo_write_strategy=None)
+
+    def test_repeat_with_eab_data(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        # Act
+        self.display._write((bytes.fromhex('01 02 03'), 3), (bytes.fromhex('04 05 06'), 3))
+
+        # Assert
+        self.assertIsNone(self.display.address_counter)
+
+        self.eab_write_alternate_mock.assert_called_with(self.interface, 7, (bytes.fromhex('01 04 02 05 03 06'), 3), jumbo_write_strategy=None)
+
+    def test_regen_eab_data_mismatch_format(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        # Act and assert
+        with self.assertRaisesRegex(ValueError, 'must be provided in same form'):
+            self.display._write(bytes.fromhex('01 02 03'), (b'\x00', 3))
+
+    def test_regen_eab_data_mismatch_length(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        # Act and assert
+        with self.assertRaisesRegex(ValueError, 'data length must be equal'):
+            self.display._write(bytes.fromhex('01 02 03'), bytes.fromhex('01 02'))
+
+    def test_regen_eab_data_mismatch_length_repeat(self):
+        # Arrange
+        self.display.eab_address = 7
+
+        # Act and assert
+        with self.assertRaisesRegex(ValueError, 'pattern length must be equal'):
+            self.display._write((bytes.fromhex('01 02 03'), 3), (b'\x00', 2))
 
     def test_address_if_current_address_unknown(self):
         # Arrange
         self.assertIsNone(self.display.address_counter)
 
         # Act
-        self.display._write(bytes.fromhex('01 02 03'), address=80)
+        self.display._write(bytes.fromhex('01 02 03'), None, address=80)
 
         # Assert
         self.assertEqual(self.display.address_counter, 83)
@@ -420,7 +578,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.address_counter = 160
 
         # Act
-        self.display._write(bytes.fromhex('01 02 03'), address=80)
+        self.display._write(bytes.fromhex('01 02 03'), None, address=80)
 
         # Assert
         self.assertEqual(self.display.address_counter, 83)
@@ -432,7 +590,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.address_counter = 80
 
         # Act
-        self.display._write(bytes.fromhex('01 02 03'), address=80)
+        self.display._write(bytes.fromhex('01 02 03'), None, address=80)
 
         # Assert
         self.assertEqual(self.display.address_counter, 83)
@@ -446,7 +604,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.assertIsNone(self.display.address_counter)
 
         # Act
-        self.display._write(bytes.fromhex('01 02 03'), restore_original_address=True)
+        self.display._write(bytes.fromhex('01 02 03'), None, restore_original_address=True)
 
         # Assert
         self.assertEqual(self.display.address_counter, 160)
@@ -458,7 +616,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.address_counter = 160
 
         # Act
-        self.display._write(bytes.fromhex('01 02 03'), restore_original_address=True)
+        self.display._write(bytes.fromhex('01 02 03'), None, restore_original_address=True)
 
         # Assert
         self.assertEqual(self.display.address_counter, 160)

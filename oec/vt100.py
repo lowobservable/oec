@@ -192,9 +192,9 @@ class VT100Session(Session):
                 character = row_buffer[column]
 
                 # TODO: Investigate multi-byte or zero-byte cases further.
-                byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
+                regen_byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
 
-                self.terminal.display.buffered_write(byte, row=row, column=column)
+                self.terminal.display.buffered_write(regen_byte, 0x00, row=row, column=column)
 
         self.vt100_screen.dirty.clear()
 

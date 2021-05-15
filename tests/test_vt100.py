@@ -27,9 +27,9 @@ class SessionHandleHostTestCase(unittest.TestCase):
         self.session.handle_host()
 
         # Assert
-        self.terminal.display.buffered_write.assert_any_call(0x80, row=0, column=0)
-        self.terminal.display.buffered_write.assert_any_call(0x81, row=0, column=1)
-        self.terminal.display.buffered_write.assert_any_call(0x82, row=0, column=2)
+        self.terminal.display.buffered_write.assert_any_call(0x80, 0x00, row=0, column=0)
+        self.terminal.display.buffered_write.assert_any_call(0x81, 0x00, row=0, column=1)
+        self.terminal.display.buffered_write.assert_any_call(0x82, 0x00, row=0, column=2)
 
         self.terminal.display.flush.assert_called()
 

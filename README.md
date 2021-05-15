@@ -18,8 +18,7 @@ expect from a later model 3174, but it does provide basic TN3270 and VT100
 emulation.
 
   - [x] TN3270
-      - [x] Basic TN3270
-      - [ ] Extended Data Stream
+      - [x] Extended Data Stream
       - [ ] TN3270E
       - [ ] SSL/TLS
   - [x] VT100

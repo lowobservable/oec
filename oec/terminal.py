@@ -5,8 +5,8 @@ oec.terminal
 
 import time
 import logging
-from coax import read_terminal_id, read_extended_id, PollAction, Control, ReceiveError, \
-                 ProtocolError
+from coax import read_terminal_id, read_extended_id, PollAction, Control, Feature, \
+                 ReceiveError, ProtocolError
 
 from .display import Dimensions, Display 
 from .keyboard import Keyboard
@@ -59,7 +59,8 @@ def read_terminal_ids(interface, extended_id_retry_attempts=3):
 class Terminal:
     """Terminal information and devices."""
 
-    def __init__(self, interface, terminal_id, extended_id, features, keymap):
+    def __init__(self, interface, terminal_id, extended_id, features, keymap,
+            jumbo_write_strategy=None):
         self.interface = interface
         self.terminal_id = terminal_id
         self.extended_id = extended_id
@@ -67,7 +68,8 @@ class Terminal:
 
         dimensions = get_dimensions(self.terminal_id, self.extended_id)
 
-        self.display = Display(interface, dimensions)
+        self.display = Display(interface, dimensions, features.get(Feature.EAB),
+                jumbo_write_strategy=jumbo_write_strategy)
         self.keyboard = Keyboard(keymap)
 
         self.alarm = False

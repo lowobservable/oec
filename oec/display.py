@@ -5,9 +5,11 @@ oec.display
 
 from collections import namedtuple
 import logging
+from more_itertools import interleave
 from sortedcontainers import SortedSet
 from coax import read_address_counter_hi, read_address_counter_lo, \
-                 load_address_counter_hi, load_address_counter_lo, write_data
+                 load_address_counter_hi, load_address_counter_lo, write_data, \
+                 eab_load_mask, eab_write_alternate
 
 _ASCII_CHAR_MAP = {
     '>': 0x08,
@@ -168,15 +170,17 @@ def encode_string(string, errors='replace'):
 Dimensions = namedtuple('Dimensions', ['rows', 'columns'])
 
 class Display:
-    def __init__(self, interface, dimensions):
+    def __init__(self, interface, dimensions, eab_address, jumbo_write_strategy=None):
         self.logger = logging.getLogger(__name__)
 
         self.interface = interface
         self.dimensions = dimensions
+        self.eab_address = eab_address
 
         (rows, columns) = self.dimensions
 
-        self.buffer = bytearray(rows * columns)
+        self.regen_buffer = bytearray(rows * columns)
+        self.eab_buffer = bytearray(rows * columns)
         self.dirty = SortedSet()
 
         self.address_counter = None
@@ -186,6 +190,12 @@ class Display:
         self.cursor_reverse = False
         self.cursor_blink = False
 
+        self.jumbo_write_strategy = jumbo_write_strategy
+
+    @property
+    def has_eab(self):
+        return self.eab_address is not None
+
     def move_cursor(self, index=None, row=None, column=None, force_load=False):
         """Load the address counter."""
         address = self._calculate_address(index=index, row=row, column=column)
@@ -194,7 +204,14 @@ class Display:
 
         return self._load_address_counter(address, force_load)
 
-    def buffered_write(self, byte, index=None, row=None, column=None):
+    def load_eab_mask(self, mask):
+        """Load the EAB mask."""
+        if not self.has_eab:
+            raise RuntimeError('No EAB feature')
+
+        eab_load_mask(self.interface, self.eab_address, mask)
+
+    def buffered_write(self, regen_byte, eab_byte, index=None, row=None, column=None):
         if index is None:
             if row is None or column is None:
                 raise ValueError('Either index or row and column is required')
@@ -203,10 +220,11 @@ class Display:
 
         # TODO: Verify that index is within range.
 
-        if self.buffer[index] == byte:
+        if self.regen_buffer[index] == regen_byte and (self.eab_buffer[index] == eab_byte or not self.has_eab):
             return False
 
-        self.buffer[index] = byte
+        self.regen_buffer[index] = regen_byte
+        self.eab_buffer[index] = eab_byte if self.has_eab else 0x00
 
         self.dirty.add(index)
 
@@ -227,11 +245,12 @@ class Display:
             address = columns
             count = rows * columns
 
-        self._write((b'\x00', count), address=address)
+        self._write((b'\x00', count), (b'\x00', count) if self.has_eab else None, address=address)
 
-        # Update the buffer and dirty indicators to reflect the cleared screen.
+        # Update the buffers and dirty indicators to reflect the cleared screen.
         for index in range(rows * columns):
-            self.buffer[index] = 0x00
+            self.regen_buffer[index] = 0x00
+            self.eab_buffer[index] = 0x00
 
         self.dirty.clear()
 
@@ -303,12 +322,13 @@ class Display:
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Flushing changes for range {start_index}-{end_index}')
 
-        data = self.buffer[start_index:end_index+1]
+        regen_data = self.regen_buffer[start_index:end_index+1]
+        eab_data = self.eab_buffer[start_index:end_index+1] if self.has_eab else None
 
         address = self._calculate_address(start_index)
 
         try:
-            self._write(data, address=address)
+            self._write(regen_data, eab_data, address=address)
         except Exception as error:
             # TODO: This could leave the address_counter incorrect.
             self.logger.error(f'Write error: {error}', exc_info=error)
@@ -318,7 +338,23 @@ class Display:
 
         return self.address_counter
 
-    def _write(self, data, address=None, restore_original_address=False):
+    def _write(self, regen_data, eab_data, address=None, restore_original_address=False):
+        if eab_data is not None:
+            if not self.has_eab:
+                raise RuntimeError('No EAB feature')
+
+            if isinstance(regen_data, tuple) and isinstance(eab_data, tuple):
+                if len(regen_data[0]) != len(eab_data[0]):
+                    raise ValueError('Regen and EAB pattern length must be equal')
+
+                if regen_data[1] != eab_data[1]:
+                    raise ValueError('Regen and EAB pattern count must be equal')
+            elif not isinstance(regen_data, tuple) and not isinstance(eab_data, tuple):
+                if len(regen_data) != len(eab_data):
+                    raise ValueError('Regen and EAB data length must be equal')
+            else:
+                raise ValueError('Regen and EAB data must be provided in same form')
+
         if restore_original_address:
             original_address = self.address_counter
 
@@ -328,12 +364,23 @@ class Display:
         if address is not None:
             self._load_address_counter(address, force_load=False)
 
-        write_data(self.interface, data)
+        if eab_data is not None:
+            # Validation of regen and EAB data form has been performed.
+            if isinstance(regen_data, tuple):
+                data = (bytes(interleave(regen_data[0], eab_data[0])), regen_data[1])
+            else:
+                data = bytes(interleave(regen_data, eab_data))
 
-        if isinstance(address, tuple):
-            length = len(data[0]) * data[1]
+            eab_write_alternate(self.interface, self.eab_address, data,
+                    jumbo_write_strategy=self.jumbo_write_strategy)
         else:
-            length = len(data)
+            write_data(self.interface, regen_data,
+                    jumbo_write_strategy=self.jumbo_write_strategy)
+
+        if isinstance(regen_data, tuple):
+            length = len(regen_data[0]) * regen_data[1]
+        else:
+            length = len(regen_data)
 
         self.address_counter = self._calculate_address_after_write(address, length)
 
@@ -348,7 +395,7 @@ class StatusLine:
         self.columns = display.dimensions.columns
 
     def write(self, column, data):
-        self.display._write(data, address=column, restore_original_address=True)
+        self.display._write(data, None, address=column, restore_original_address=True)
 
     def write_string(self, column, string):
         self.write(column, encode_string(string))

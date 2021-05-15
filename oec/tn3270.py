@@ -4,8 +4,8 @@ oec.tn3270
 """
 
 import logging
-from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, OperatorError, \
-                   ProtectedCellOperatorError, FieldOverflowOperatorError
+from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, Color, Highlight, \
+                   OperatorError, ProtectedCellOperatorError, FieldOverflowOperatorError
 from tn3270.ebcdic import DUP, FM
 
 from .session import Session, SessionDisconnectedError
@@ -47,13 +47,12 @@ AID_KEY_MAP = {
 class TN3270Session(Session):
     """TN3270 session."""
 
-    def __init__(self, terminal, host, port, extended_data_stream=True):
+    def __init__(self, terminal, host, port):
         self.logger = logging.getLogger(__name__)
 
         self.terminal = terminal
         self.host = host
         self.port = port
-        self.extended_data_stream = extended_data_stream
 
         self.telnet = None
         self.emulator = None
@@ -71,7 +70,14 @@ class TN3270Session(Session):
 
         (rows, columns) = self.terminal.display.dimensions
 
-        self.emulator = Emulator(self.telnet, rows, columns)
+        if self.terminal.display.has_eab:
+            supported_colors = 8
+            supported_highlights = [Highlight.BLINK, Highlight.REVERSE, Highlight.UNDERSCORE]
+        else:
+            supported_colors = 1
+            supported_highlights = []
+
+        self.emulator = Emulator(self.telnet, rows, columns, supported_colors, supported_highlights)
 
         self.emulator.alarm = lambda: self.terminal.sound_alarm()
 
@@ -156,10 +162,17 @@ class TN3270Session(Session):
         self.terminal.display.status_line.write_keyboard_insert(self.keyboard_insert)
 
     def _connect_host(self):
-        terminal_type = f'IBM-3278-{self.terminal.terminal_id.model}'
+        # We will pretend a 3279 without EAB is a 3278.
+        if self.terminal.display.has_eab:
+            type = '3279'
+        else:
+            type = '3278'
 
-        if self.extended_data_stream:
-            terminal_type += '-E'
+        # Although a IBM 3278 does not support the formatting enabled by the extended
+        # data stream, the capabilities will be reported in the query reply.
+        terminal_type = f'IBM-{type}-{self.terminal.terminal_id.model}-E'
+
+        self.logger.info(f'Terminal Type = {terminal_type}')
 
         self.telnet = Telnet(terminal_type)
 
@@ -171,17 +184,21 @@ class TN3270Session(Session):
         self.telnet = None
 
     def _apply(self):
+        has_eab = self.terminal.display.has_eab
+
         for address in self.emulator.dirty:
             cell = self.emulator.cells[address]
 
-            byte = 0x00
+            regen_byte = 0x00
 
             if isinstance(cell, AttributeCell):
-                byte = self._map_attribute(cell)
+                regen_byte = self._map_attribute(cell)
             elif isinstance(cell, CharacterCell):
-                byte = self._map_character(cell)
+                regen_byte = self._map_character(cell)
 
-            self.terminal.display.buffered_write(byte, index=address)
+            eab_byte = self._map_formatting(cell.formatting) if has_eab else None
+
+            self.terminal.display.buffered_write(regen_byte, eab_byte, index=address)
 
         self.emulator.dirty.clear()
 
@@ -216,16 +233,43 @@ class TN3270Session(Session):
         if byte == FM:
             return encode_ascii_character(ord(';'))
 
-        # TODO: Temporary workaround to show empty reverse video fields until EAB
-        # support is added.
-        if byte == 0x40 and cell.formatting is not None and cell.formatting.reverse:
-            return encode_ascii_character(ord('#'))
-
         # TODO: Temporary workaround until character set support is added.
         if cell.character_set is not None:
             return encode_ascii_character(ord('ß'))
 
         return encode_ebcdic_character(byte)
+
+    def _map_formatting(self, formatting):
+        if formatting is None:
+            return 0x00
+
+        byte = 0x00
+
+        # Map the 3270 color to EAB color.
+        if formatting.color == Color.BLUE:
+            byte |= 0x08
+        elif formatting.color == Color.RED:
+            byte |= 0x10
+        elif formatting.color == Color.PINK:
+            byte |= 0x18
+        elif formatting.color == Color.GREEN:
+            byte |= 0x20
+        elif formatting.color == Color.TURQUOISE:
+            byte |= 0x28
+        elif formatting.color == Color.YELLOW:
+            byte |= 0x30
+        elif formatting.color == Color.WHITE:
+            byte |= 0x38
+
+        # Map the 3270 highlight to EAB highlight.
+        if formatting.blink:
+            byte |= 0x40
+        elif formatting.reverse:
+            byte |= 0x80
+        elif formatting.underscore:
+            byte |= 0xc0
+
+        return byte
 
     def _format_message_area(self):
         message_area = b''

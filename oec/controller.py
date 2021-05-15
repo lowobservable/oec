@@ -3,11 +3,13 @@ oec.controller
 ~~~~~~~~~~~~~~
 """
 
+import os
 import time
 import logging
 import selectors
+from textwrap import dedent
 from coax import poll, poll_ack, load_control_register, get_features, PollAction, \
-                 KeystrokePollResponse, TerminalType, ReceiveTimeout, \
+                 KeystrokePollResponse, TerminalType, Feature, ReceiveTimeout, \
                  ReceiveError, ProtocolError
 
 from .terminal import Terminal, UnsupportedTerminalError, read_terminal_ids
@@ -104,6 +106,8 @@ class Controller:
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
 
+        jumbo_write_strategy = _get_jumbo_write_strategy()
+
         # Read the terminal identifiers.
         (terminal_id, extended_id) = read_terminal_ids(self.interface)
 
@@ -117,17 +121,27 @@ class Controller:
 
         self.logger.info(f'Features = {features}')
 
+        if Feature.EAB in features:
+            if self.interface.legacy_firmware_detected and jumbo_write_strategy is None:
+                del features[Feature.EAB]
+
+                _print_no_i1_eab_notice()
+
         # Get the keymap.
         keymap = self.get_keymap(terminal_id, extended_id)
 
         # Initialize the terminal.
         self.terminal = Terminal(self.interface, terminal_id, extended_id,
-                                 features, keymap)
+                                 features, keymap,
+                                 jumbo_write_strategy=jumbo_write_strategy)
 
         (rows, columns) = self.terminal.display.dimensions
         keymap_name = self.terminal.keyboard.keymap.name
 
         self.logger.info(f'Rows = {rows}, Columns = {columns}, Keymap = {keymap_name}')
+
+        if self.terminal.display.has_eab:
+            self.terminal.display.load_eab_mask(0xff)
 
         self.terminal.display.clear(clear_status_line=True)
 
@@ -253,3 +267,45 @@ class Controller:
 
     def _load_control_register(self):
         load_control_register(self.interface, self.terminal.get_control_register())
+
+def _get_jumbo_write_strategy():
+    value = os.environ.get('COAX_JUMBO')
+
+    if value is None:
+        return None
+
+    if value in ['split', 'ignore']:
+        return value
+
+    self.logger.warning(f'Unsupported COAX_JUMBO option: {value}')
+
+    return None
+
+def _print_no_i1_eab_notice():
+    notice = '''
+    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
+
+    Your terminal is reporting the existence of an EAB feature that allows extended
+    colors and formatting, however...
+
+    I think you are using an older firmware on the 1st generation, Arduino Mega
+    based, interface which does not support the "jumbo write" required to write a
+    full screen to the regen and EAB buffers.
+
+    I'm going to continue as if the EAB feature did not exist...
+
+    If you want to override this behavior, you can set the COAX_JUMBO environment
+    variable as follows:
+
+    - COAX_JUMBO=split  - split large writes into multiple smaller 32-byte writes
+                          before sending to the interface, this will result in
+                          additional round trips to the interface which may
+                          manifest as visible incremental changes being applied
+                          to the screen
+    - COAX_JUMBO=ignore - try a jumbo write, anyway, use this option if you
+                          believe you are seeing this behavior in error
+
+    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
+    '''
+
+    print(dedent(notice))
