@@ -19,7 +19,7 @@ emulation.
 
   - [x] TN3270
       - [x] Extended Data Stream
-      - [ ] TN3270E
+      - [x] Basic TN3270E
       - [ ] SSL/TLS
   - [x] VT100
   - [ ] Connection Menu

@@ -178,6 +178,11 @@ class TN3270Session(Session):
 
         self.telnet.open(self.host, self.port)
 
+        if self.telnet.is_tn3270e_negotiated:
+            self.logger.info(f'TN3270E mode negotiated: Device Type = {self.telnet.device_type}, Device Name = {self.telnet.device_name}')
+        else:
+            self.logger.debug('Unable to negotiate TN3270E mode')
+
     def _disconnect_host(self):
         self.telnet.close()
 
