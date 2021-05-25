@@ -170,10 +170,10 @@ def encode_string(string, errors='replace'):
 Dimensions = namedtuple('Dimensions', ['rows', 'columns'])
 
 class Display:
-    def __init__(self, interface, dimensions, eab_address, jumbo_write_strategy=None):
+    def __init__(self, terminal, dimensions, eab_address, jumbo_write_strategy=None):
         self.logger = logging.getLogger(__name__)
 
-        self.interface = interface
+        self.terminal = terminal
         self.dimensions = dimensions
         self.eab_address = eab_address
 
@@ -186,9 +186,6 @@ class Display:
         self.address_counter = None
 
         self.status_line = StatusLine(self)
-
-        self.cursor_reverse = False
-        self.cursor_blink = False
 
         self.jumbo_write_strategy = jumbo_write_strategy
 
@@ -209,7 +206,7 @@ class Display:
         if not self.has_eab:
             raise RuntimeError('No EAB feature')
 
-        eab_load_mask(self.interface, self.eab_address, mask)
+        eab_load_mask(self.terminal.interface, self.eab_address, mask)
 
     def buffered_write(self, regen_byte, eab_byte, index=None, row=None, column=None):
         if index is None:
@@ -257,10 +254,14 @@ class Display:
         self.move_cursor(row=0, column=0, force_load=True)
 
     def toggle_cursor_blink(self):
-        self.cursor_blink = not self.cursor_blink
+        self.terminal.control.cursor_blink = not self.terminal.control.cursor_blink
+
+        self.terminal.load_control_register()
 
     def toggle_cursor_reverse(self):
-        self.cursor_reverse = not self.cursor_reverse
+        self.terminal.control.cursor_reverse = not self.terminal.control.cursor_reverse
+
+        self.terminal.load_control_register()
 
     def _get_index(self, row, column):
         return (row * self.dimensions.columns) + column
@@ -289,8 +290,8 @@ class Display:
         return address
 
     def _read_address_counter(self):
-        hi = read_address_counter_hi(self.interface)
-        lo = read_address_counter_lo(self.interface)
+        hi = read_address_counter_hi(self.terminal.interface)
+        lo = read_address_counter_lo(self.terminal.interface)
 
         return (hi << 8) | lo
 
@@ -302,10 +303,10 @@ class Display:
         (current_hi, current_lo) = _split_address(self.address_counter)
 
         if hi != current_hi or force_load:
-            load_address_counter_hi(self.interface, hi)
+            load_address_counter_hi(self.terminal.interface, hi)
 
         if lo != current_lo or force_load:
-            load_address_counter_lo(self.interface, lo)
+            load_address_counter_lo(self.terminal.interface, lo)
 
         self.address_counter = address
 
@@ -371,10 +372,10 @@ class Display:
             else:
                 data = bytes(interleave(regen_data, eab_data))
 
-            eab_write_alternate(self.interface, self.eab_address, data,
+            eab_write_alternate(self.terminal.interface, self.eab_address, data,
                     jumbo_write_strategy=self.jumbo_write_strategy)
         else:
-            write_data(self.interface, regen_data,
+            write_data(self.terminal.interface, regen_data,
                     jumbo_write_strategy=self.jumbo_write_strategy)
 
         if isinstance(regen_data, tuple):

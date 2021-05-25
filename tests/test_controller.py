@@ -1,6 +1,6 @@
 import selectors
 import unittest
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 from coax import PollAction, PowerOnResetCompletePollResponse, KeystrokePollResponse, ReceiveTimeout
 from coax.protocol import TerminalId
 
@@ -8,11 +8,10 @@ import context
 
 from oec.controller import Controller
 from oec.session import SessionDisconnectedError
+from oec.terminal import Terminal, UnsupportedTerminalError
+from oec.display import Dimensions
 from oec.keyboard import KeyboardModifiers, Key
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
-
-CUT_TERMINAL_IDS = (TerminalId(0b11110100), 'c1348300')
-DFT_TERMINAL_IDS = (TerminalId(0b00000001), None)
 
 class RunLoopTestCase(unittest.TestCase):
     def setUp(self):
@@ -31,29 +30,29 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.controller._update_session = Mock()
 
-        patcher = patch('oec.controller.poll')
+        self.terminal = Terminal(self.interface, TerminalId(0b11110100), 'c1348300', Dimensions(24, 80), { }, KEYMAP_3278_2, None)
 
-        self.poll_mock = patcher.start()
+        self.terminal.setup = Mock()
+
+        self.terminal.display.toggle_cursor_blink = Mock()
+        self.terminal.display.toggle_cursor_reverse = Mock()
+        self.terminal.display._write = Mock()
+
+        self.terminal.keyboard.toggle_clicker = Mock()
+
+        self.poll_mock = Mock()
+
+        patcher = patch('oec.controller.poll', self.poll_mock)
+
+        patcher.start()
+
+        patcher = patch('oec.terminal.poll', self.poll_mock)
+
+        patcher.start()
 
         patcher = patch('oec.controller.poll_ack')
 
         self.poll_ack_mock = patcher.start()
-
-        patcher = patch('oec.controller.read_terminal_ids')
-
-        self.read_terminal_ids_mock = patcher.start()
-
-        self.read_terminal_ids_mock.return_value = CUT_TERMINAL_IDS
-
-        patcher = patch('oec.controller.load_control_register')
-
-        self.load_control_register_mock = patcher.start()
-
-        patcher = patch('oec.controller.get_features')
-
-        self.get_features_mock = patcher.start()
-
-        self.get_features_mock.return_value = { }
 
         patcher = patch('oec.controller.time.perf_counter')
 
@@ -63,17 +62,11 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.sleep_mock = patcher.start()
 
-        patcher = patch('oec.display.load_address_counter_hi')
+        patcher = patch('oec.controller.create_terminal')
 
-        patcher.start()
+        self.create_terminal_mock = patcher.start()
 
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        patcher.start()
+        self.create_terminal_mock.return_value = self.terminal
 
         self.addCleanup(patch.stopall)
 
@@ -95,7 +88,7 @@ class RunLoopTestCase(unittest.TestCase):
         self.controller._update_session.assert_called()
 
     def test_unsupported_terminal_attached(self):
-        self.read_terminal_ids_mock.return_value = DFT_TERMINAL_IDS
+        self.create_terminal_mock.side_effect = [UnsupportedTerminalError]
 
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
 
@@ -136,91 +129,50 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.assertEqual(self.create_session_mock.call_count, 2)
 
-    def test_alarm(self):
-        # Arrange
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-
-        self.assertIsNotNone(self.controller.terminal)
-
-        # Act
-        self.controller.terminal.sound_alarm()
-
-        # Assert
-        self._assert_run_loop(0.5, None, True, 0.5, False)
-
-        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.ALARM)
-
-        self.assertFalse(self.controller.terminal.alarm)
-
     def test_toggle_cursor_blink(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
 
-        self.assertFalse(self.controller.terminal.display.cursor_blink)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
+
+        self.terminal.display.toggle_cursor_blink.assert_called_once()
+
+        self.terminal.display.toggle_cursor_blink.reset_mock()
 
         self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
 
-        self.assertTrue(self.controller.terminal.display.cursor_blink)
-
-        self.load_control_register_mock.assert_called()
-
-        self.assertTrue(self.load_control_register_mock.call_args[0][1].cursor_blink)
-
-        self.load_control_register_mock.reset_mock()
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-
-        self.assertFalse(self.controller.terminal.display.cursor_blink)
-
-        self.load_control_register_mock.assert_called()
-
-        self.assertFalse(self.load_control_register_mock.call_args[0][1].cursor_blink)
+        self.terminal.display.toggle_cursor_blink.assert_called_once()
 
     def test_toggle_cursor_reverse(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
 
-        self.assertFalse(self.controller.terminal.display.cursor_reverse)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
+        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
+
+        self.terminal.display.toggle_cursor_reverse.assert_called_once()
+
+        self.terminal.display.toggle_cursor_reverse.reset_mock()
 
         self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
         self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
         self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
 
-        self.assertTrue(self.controller.terminal.display.cursor_reverse)
-
-        self.load_control_register_mock.assert_called()
-
-        self.assertTrue(self.load_control_register_mock.call_args[0][1].cursor_reverse)
-
-        self.load_control_register_mock.reset_mock()
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-
-        self.assertFalse(self.controller.terminal.display.cursor_reverse)
-
-        self.load_control_register_mock.assert_called()
-
-        self.assertFalse(self.load_control_register_mock.call_args[0][1].cursor_reverse)
+        self.terminal.display.toggle_cursor_reverse.assert_called_once()
 
     def test_toggle_clicker(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
 
-        self.assertFalse(self.controller.terminal.keyboard.clicker)
-
         self._assert_run_loop(0, KeystrokePollResponse(0b0101011110), False, 0, True)
         self._assert_run_loop(0, None, False, 0, False)
 
-        self.assertTrue(self.controller.terminal.keyboard.clicker)
+        self.terminal.keyboard.toggle_clicker.assert_called_once()
 
-        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.ENABLE_KEYBOARD_CLICKER)
+        self.terminal.keyboard.toggle_clicker.reset_mock()
 
         self._assert_run_loop(0.5, KeystrokePollResponse(0b0101011110), True, 0.5, True)
         self._assert_run_loop(1, None, False, 0, False)
 
-        self.assertFalse(self.controller.terminal.keyboard.clicker)
-
-        self.assertEqual(self.poll_mock.call_args[0][1], PollAction.DISABLE_KEYBOARD_CLICKER)
+        self.terminal.keyboard.toggle_clicker.assert_called_once()
 
     def _assert_run_loop(self, poll_time, poll_response, expected_update_session, expected_poll_delay, expected_poll_ack):
         # Arrange

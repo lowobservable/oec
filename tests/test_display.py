@@ -7,11 +7,11 @@ from oec.display import Dimensions, Display, encode_ascii_character, encode_ebcd
 
 class DisplayMoveCursorTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
 
@@ -54,11 +54,11 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
 
 class DisplayBufferedWriteTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, Dimensions(24, 80), None)
+        self.display = Display(self.terminal, Dimensions(24, 80), None)
 
     def test_with_no_eab(self):
         # Act
@@ -113,11 +113,11 @@ class DisplayBufferedWriteTestCase(unittest.TestCase):
 
 class DisplayFlushTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         self.display._flush_range = Mock()
 
@@ -196,11 +196,11 @@ class DisplayFlushTestCase(unittest.TestCase):
 
 class DisplayClearTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
         self.display._write = Mock(wraps=self.display._write)
@@ -305,11 +305,11 @@ class DisplayClearTestCase(unittest.TestCase):
 
 class DisplayFlushRangeTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         self.display._write = Mock(wraps=self.display._write)
 
@@ -363,11 +363,11 @@ class DisplayFlushRangeTestCase(unittest.TestCase):
 
 class DisplayLoadAddressCounterTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         patcher = patch('oec.display.load_address_counter_hi')
 
@@ -386,8 +386,8 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 895)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.interface, 3)
-        self.load_address_counter_lo_mock.assert_called_with(self.interface, 127)
+        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 3)
+        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 127)
 
     def test_hi_change(self):
         # Arrange
@@ -402,7 +402,7 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 1151)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.interface, 4)
+        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 4)
         self.load_address_counter_lo_mock.assert_not_called()
 
     def test_lo_change(self):
@@ -419,7 +419,7 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         self.assertEqual(self.display.address_counter, 896)
 
         self.load_address_counter_hi_mock.assert_not_called()
-        self.load_address_counter_lo_mock.assert_called_with(self.interface, 128)
+        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 128)
 
     def test_hi_lo_change(self):
         # Arrange
@@ -434,8 +434,8 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 1152)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.interface, 4)
-        self.load_address_counter_lo_mock.assert_called_with(self.interface, 128)
+        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 4)
+        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 128)
 
     def test_no_change(self):
         # Arrange
@@ -466,16 +466,16 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 80)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.interface, 0)
-        self.load_address_counter_lo_mock.assert_called_with(self.interface, 80)
+        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 0)
+        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 80)
 
 class DisplayWriteTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.terminal = Mock()
 
         dimensions = Dimensions(24, 80)
 
-        self.display = Display(self.interface, dimensions, None)
+        self.display = Display(self.terminal, dimensions, None)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
 
@@ -504,7 +504,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.write_data_mock.assert_called_with(self.interface, bytes.fromhex('01 02 03'), jumbo_write_strategy=None)
+        self.write_data_mock.assert_called_with(self.terminal.interface, bytes.fromhex('01 02 03'), jumbo_write_strategy=None)
 
     def test_with_eab_data(self):
         # Arrange
@@ -516,7 +516,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.eab_write_alternate_mock.assert_called_with(self.interface, 7, bytes.fromhex('01 04 02 05 03 06'), jumbo_write_strategy=None)
+        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, bytes.fromhex('01 04 02 05 03 06'), jumbo_write_strategy=None)
 
     def test_repeat_with_no_eab_data(self):
         # Act
@@ -525,7 +525,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.write_data_mock.assert_called_with(self.interface, (bytes.fromhex('01 02 03'), 3), jumbo_write_strategy=None)
+        self.write_data_mock.assert_called_with(self.terminal.interface, (bytes.fromhex('01 02 03'), 3), jumbo_write_strategy=None)
 
     def test_repeat_with_eab_data(self):
         # Arrange
@@ -537,7 +537,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertIsNone(self.display.address_counter)
 
-        self.eab_write_alternate_mock.assert_called_with(self.interface, 7, (bytes.fromhex('01 04 02 05 03 06'), 3), jumbo_write_strategy=None)
+        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, (bytes.fromhex('01 04 02 05 03 06'), 3), jumbo_write_strategy=None)
 
     def test_regen_eab_data_mismatch_format(self):
         # Arrange

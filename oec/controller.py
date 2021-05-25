@@ -3,16 +3,13 @@ oec.controller
 ~~~~~~~~~~~~~~
 """
 
-import os
 import time
 import logging
 import selectors
-from textwrap import dedent
-from coax import poll, poll_ack, load_control_register, get_features, PollAction, \
-                 KeystrokePollResponse, TerminalType, Feature, ReceiveTimeout, \
+from coax import poll, poll_ack, KeystrokePollResponse, ReceiveTimeout, \
                  ReceiveError, ProtocolError
 
-from .terminal import Terminal, UnsupportedTerminalError, read_terminal_ids
+from .terminal import create_terminal, UnsupportedTerminalError
 from .keyboard import Key
 from .session import SessionDisconnectedError
 
@@ -106,44 +103,9 @@ class Controller:
     def _handle_terminal_attached(self, poll_response):
         self.logger.info('Terminal attached')
 
-        jumbo_write_strategy = _get_jumbo_write_strategy()
+        self.terminal = create_terminal(self.interface, poll_response, self.get_keymap)
 
-        # Read the terminal identifiers.
-        (terminal_id, extended_id) = read_terminal_ids(self.interface)
-
-        self.logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
-
-        if terminal_id.type != TerminalType.CUT:
-            raise UnsupportedTerminalError('Only CUT type terminals are supported')
-
-        # Get the terminal features.
-        features = get_features(self.interface)
-
-        self.logger.info(f'Features = {features}')
-
-        if Feature.EAB in features:
-            if self.interface.legacy_firmware_detected and jumbo_write_strategy is None:
-                del features[Feature.EAB]
-
-                _print_no_i1_eab_notice()
-
-        # Get the keymap.
-        keymap = self.get_keymap(terminal_id, extended_id)
-
-        # Initialize the terminal.
-        self.terminal = Terminal(self.interface, terminal_id, extended_id,
-                                 features, keymap,
-                                 jumbo_write_strategy=jumbo_write_strategy)
-
-        (rows, columns) = self.terminal.display.dimensions
-        keymap_name = self.terminal.keyboard.keymap.name
-
-        self.logger.info(f'Rows = {rows}, Columns = {columns}, Keymap = {keymap_name}')
-
-        if self.terminal.display.has_eab:
-            self.terminal.display.load_eab_mask(0xff)
-
-        self.terminal.display.clear(clear_status_line=True)
+        self.terminal.setup()
 
         # Show the attached indicator on the status line.
         self.terminal.display.status_line.write_string(0, 'S')
@@ -221,12 +183,8 @@ class Controller:
 
         if key == Key.CURSOR_BLINK:
             self.terminal.display.toggle_cursor_blink()
-
-            self._load_control_register()
         elif key == Key.ALT_CURSOR:
             self.terminal.display.toggle_cursor_reverse()
-
-            self._load_control_register()
         elif key == Key.CLICKER:
             self.terminal.keyboard.toggle_clicker()
         elif self.session:
@@ -235,9 +193,12 @@ class Controller:
     def _poll(self):
         self.last_poll_time = time.perf_counter()
 
-        poll_action = self.terminal.get_poll_action() if self.terminal else PollAction.NONE
-
-        poll_response = poll(self.interface, poll_action, receive_timeout=1)
+        # If a terminal is connected, use the terminal method to ensure that
+        # any queued POLL action is applied.
+        if self.terminal:
+            poll_response = self.terminal.poll(receive_timeout=1)
+        else:
+            poll_response = poll(self.interface, receive_timeout=1)
 
         if poll_response:
             try:
@@ -264,48 +225,3 @@ class Controller:
             period = self.disconnected_poll_period
 
         return max((self.last_poll_time + period) - current_time, 0)
-
-    def _load_control_register(self):
-        load_control_register(self.interface, self.terminal.get_control_register())
-
-def _get_jumbo_write_strategy():
-    value = os.environ.get('COAX_JUMBO')
-
-    if value is None:
-        return None
-
-    if value in ['split', 'ignore']:
-        return value
-
-    self.logger.warning(f'Unsupported COAX_JUMBO option: {value}')
-
-    return None
-
-def _print_no_i1_eab_notice():
-    notice = '''
-    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
-
-    Your terminal is reporting the existence of an EAB feature that allows extended
-    colors and formatting, however...
-
-    I think you are using an older firmware on the 1st generation, Arduino Mega
-    based, interface which does not support the "jumbo write" required to write a
-    full screen to the regen and EAB buffers.
-
-    I'm going to continue as if the EAB feature did not exist...
-
-    If you want to override this behavior, you can set the COAX_JUMBO environment
-    variable as follows:
-
-    - COAX_JUMBO=split  - split large writes into multiple smaller 32-byte writes
-                          before sending to the interface, this will result in
-                          additional round trips to the interface which may
-                          manifest as visible incremental changes being applied
-                          to the screen
-    - COAX_JUMBO=ignore - try a jumbo write, anyway, use this option if you
-                          believe you are seeing this behavior in error
-
-    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
-    '''
-
-    print(dedent(notice))
