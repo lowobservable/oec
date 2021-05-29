@@ -11,7 +11,7 @@ from coax import poll, read_terminal_id, read_extended_id, get_features, \
                  load_control_register, TerminalType, Feature, PollAction, Control, \
                  ReceiveError, ProtocolError
 
-from .display import Dimensions, Display
+from .display import Dimensions, BufferedDisplay
 from .keyboard import Keyboard
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,8 @@ class Terminal:
                                cursor_inhibit=False, cursor_reverse=False,
                                cursor_blink=False)
 
-        self.display = Display(self, dimensions, features.get(Feature.EAB),
-                               jumbo_write_strategy=jumbo_write_strategy)
+        self.display = BufferedDisplay(self, dimensions, features.get(Feature.EAB),
+                                       jumbo_write_strategy=jumbo_write_strategy)
         self.keyboard = Keyboard(keymap)
 
         self.alarm = False

@@ -203,7 +203,7 @@ class TN3270Session(Session):
 
             eab_byte = self._map_formatting(cell.formatting) if has_eab else None
 
-            self.terminal.display.buffered_write(regen_byte, eab_byte, index=address)
+            self.terminal.display.buffered_write_byte(regen_byte, eab_byte, index=address)
 
         self.emulator.dirty.clear()
 

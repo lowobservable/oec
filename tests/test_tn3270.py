@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import context
 
 from oec.session import SessionDisconnectedError
-from oec.display import Dimensions, Display
+from oec.display import Dimensions, BufferedDisplay
 from oec.keyboard import Key, KeyboardModifiers
 from oec.tn3270 import TN3270Session
 from tn3270 import AttributeCell, CharacterCell, AID, Color, ProtectedCellOperatorError, FieldOverflowOperatorError
@@ -13,17 +13,15 @@ from tn3270.emulator import CellFormatting
 
 class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
-
         self.terminal = Mock()
 
-        self.terminal.display = Display(self.interface, Dimensions(24, 80), None)
+        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), None)
 
         self.terminal.display.status_line = Mock()
         self.terminal.display.move_cursor = Mock()
+        self.terminal.display.write = Mock()
         self.terminal.display.flush = Mock()
         self.terminal.display._load_address_counter = Mock()
-        self.terminal.display._write = Mock()
 
         self.session = TN3270Session(self.terminal, 'mainframe', 23)
 
@@ -39,10 +37,8 @@ class SessionHandleHostTestCase(unittest.TestCase):
         # Act and assert
         self.assertFalse(self.session.handle_host())
 
-    def test_changes_with_no_eab(self):
+    def test_changes_with_no_eab_feature(self):
         # Arrange
-        self.terminal.display.eab_address = None
-
         self.session.emulator.update = Mock(return_value=True)
 
         cells = _create_screen_cells(24, 80)
@@ -77,18 +73,22 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.terminal.display.flush.assert_called()
 
-        self.assertEqual(self.terminal.display.regen_buffer[:109], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[109:]]))
-
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer]))
+        self.assertEqual(self.terminal.display.regen_buffer[80:189], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
+        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[189:]]))
 
         self.terminal.display.move_cursor.assert_called_with(index=8)
 
         self.assertFalse(self.session.emulator.dirty)
 
-    def test_changes_with_eab(self):
+    def test_changes_with_eab_feature(self):
         # Arrange
-        self.terminal.display.eab_address = 7
+        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), 7)
+
+        self.terminal.display.status_line = Mock()
+        self.terminal.display.move_cursor = Mock()
+        self.terminal.display.write = Mock()
+        self.terminal.display.flush = Mock()
+        self.terminal.display._load_address_counter = Mock()
 
         self.session.emulator.update = Mock(return_value=True)
 
@@ -124,12 +124,12 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.terminal.display.flush.assert_called()
 
-        self.assertEqual(self.terminal.display.regen_buffer[:109], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[109:]]))
+        self.assertEqual(self.terminal.display.regen_buffer[80:189], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
+        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[189:]]))
 
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[:104]]))
-        self.assertEqual(self.terminal.display.eab_buffer[104:109], bytes.fromhex('304080c000'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[109:]]))
+        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[:184]]))
+        self.assertEqual(self.terminal.display.eab_buffer[184:189], bytes.fromhex('304080c000'))
+        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[189:]]))
 
         self.terminal.display.move_cursor.assert_called_with(index=8)
 

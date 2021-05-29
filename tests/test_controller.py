@@ -34,9 +34,9 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.terminal.setup = Mock()
 
+        self.terminal.display.write = Mock()
         self.terminal.display.toggle_cursor_blink = Mock()
         self.terminal.display.toggle_cursor_reverse = Mock()
-        self.terminal.display._write = Mock()
 
         self.terminal.keyboard.toggle_clicker = Mock()
 

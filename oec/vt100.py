@@ -185,6 +185,8 @@ class VT100Session(Session):
         self.host_process = None
 
     def _apply(self):
+        has_eab = self.terminal.display.has_eab
+
         for row in self.vt100_screen.dirty:
             row_buffer = self.vt100_screen.buffer[row]
 
@@ -193,8 +195,9 @@ class VT100Session(Session):
 
                 # TODO: Investigate multi-byte or zero-byte cases further.
                 regen_byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
+                eab_byte = 0x00 if has_eab else None
 
-                self.terminal.display.buffered_write(regen_byte, 0x00, row=row, column=column)
+                self.terminal.display.buffered_write_byte(regen_byte, eab_byte, row=row, column=column)
 
         self.vt100_screen.dirty.clear()
 
@@ -205,4 +208,7 @@ class VT100Session(Session):
         # reliable - maybe it needs to be forced sometimes.
         cursor = self.vt100_screen.cursor
 
-        self.terminal.display.move_cursor(row=cursor.y, column=cursor.x)
+        if cursor.y < self.terminal.display.dimensions.rows and cursor.x < self.terminal.display.dimensions.columns:
+            self.terminal.display.move_cursor(row=cursor.y, column=cursor.x)
+        else:
+            self.logger.warn(f'Out of bounds cursor move to row={cursor.y}, column={cursor.x} ignored')

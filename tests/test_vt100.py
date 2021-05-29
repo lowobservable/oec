@@ -12,6 +12,7 @@ class SessionHandleHostTestCase(unittest.TestCase):
         self.terminal = Mock()
 
         self.terminal.display.dimensions = Dimensions(24, 80)
+        self.terminal.display.has_eab = True
 
         self.session = VT100Session(self.terminal, None)
 
@@ -27,9 +28,9 @@ class SessionHandleHostTestCase(unittest.TestCase):
         self.session.handle_host()
 
         # Assert
-        self.terminal.display.buffered_write.assert_any_call(0x80, 0x00, row=0, column=0)
-        self.terminal.display.buffered_write.assert_any_call(0x81, 0x00, row=0, column=1)
-        self.terminal.display.buffered_write.assert_any_call(0x82, 0x00, row=0, column=2)
+        self.terminal.display.buffered_write_byte.assert_any_call(0x80, 0x00, row=0, column=0)
+        self.terminal.display.buffered_write_byte.assert_any_call(0x81, 0x00, row=0, column=1)
+        self.terminal.display.buffered_write_byte.assert_any_call(0x82, 0x00, row=0, column=2)
 
         self.terminal.display.flush.assert_called()
 
