@@ -224,6 +224,7 @@ class UpdateSessionTestCase(unittest.TestCase):
 
         # Assert
         self.controller.session.handle_host.assert_not_called()
+        self.controller.session.render.assert_not_called()
 
         self.controller.session_selector.select.assert_not_called()
 
@@ -236,6 +237,7 @@ class UpdateSessionTestCase(unittest.TestCase):
 
         # Assert
         self.controller.session.handle_host.assert_not_called()
+        self.controller.session.render.assert_not_called()
 
         self.controller.session_selector.select.assert_called_once()
 
@@ -252,6 +254,7 @@ class UpdateSessionTestCase(unittest.TestCase):
 
         # Assert
         self.controller.session.handle_host.assert_called_once()
+        self.controller.session.render.assert_called_once()
 
         self.assertEqual(self.controller.session_selector.select.call_count, 2)
 

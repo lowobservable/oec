@@ -126,9 +126,6 @@ class VT100Session(Session):
 
         self.vt100_stream.feed(data)
 
-        self._apply()
-        self._flush()
-
         return True
 
     def handle_key(self, key, keyboard_modifiers, scan_code):
@@ -138,6 +135,10 @@ class VT100Session(Session):
             return
 
         self.host_process.write(bytes_)
+
+    def render(self):
+        self._apply()
+        self._flush()
 
     def _map_key(self, key, keyboard_modifiers):
         if keyboard_modifiers.is_alt():
@@ -204,8 +205,6 @@ class VT100Session(Session):
     def _flush(self):
         self.terminal.display.flush()
 
-        # TODO: Investigate different approaches to making cursor syncronization more
-        # reliable - maybe it needs to be forced sometimes.
         cursor = self.vt100_screen.cursor
 
         if cursor.y < self.terminal.display.dimensions.rows and cursor.x < self.terminal.display.dimensions.columns:

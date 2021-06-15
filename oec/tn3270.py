@@ -101,9 +101,6 @@ class TN3270Session(Session):
 
         self.waiting_on_host = False
 
-        self._apply()
-        self._flush()
-
         return True
 
     def handle_key(self, key, keyboard_modifiers, scan_code):
@@ -153,6 +150,7 @@ class TN3270Session(Session):
         except OperatorError as error:
             self.operator_error = error
 
+    def render(self):
         self._apply()
         self._flush()
 
@@ -194,14 +192,7 @@ class TN3270Session(Session):
         for address in self.emulator.dirty:
             cell = self.emulator.cells[address]
 
-            regen_byte = 0x00
-
-            if isinstance(cell, AttributeCell):
-                regen_byte = self._map_attribute(cell)
-            elif isinstance(cell, CharacterCell):
-                regen_byte = self._map_character(cell)
-
-            eab_byte = self._map_formatting(cell.formatting) if has_eab else None
+            (regen_byte, eab_byte) = _map_cell(cell, has_eab)
 
             self.terminal.display.buffered_write_byte(regen_byte, eab_byte, index=address)
 
@@ -219,62 +210,10 @@ class TN3270Session(Session):
 
             self.last_message_area = self.message_area
 
-        # TODO: see note in VT100 about forcing sync
         self.terminal.display.move_cursor(index=self.emulator.cursor_address)
 
-        # TODO: eek, is this the correct place to do this?
+        # TODO: This needs to be moved.
         self.operator_error = None
-
-    def _map_attribute(self, cell):
-        # Only map the protected and display bits - ignore numeric, skip and modified.
-        return 0xc0 | (cell.attribute.value & 0x2c)
-
-    def _map_character(self, cell):
-        byte = cell.byte
-
-        if byte == DUP:
-            return encode_ascii_character(ord('*'))
-
-        if byte == FM:
-            return encode_ascii_character(ord(';'))
-
-        # TODO: Temporary workaround until character set support is added.
-        if cell.character_set is not None:
-            return encode_ascii_character(ord('ß'))
-
-        return encode_ebcdic_character(byte)
-
-    def _map_formatting(self, formatting):
-        if formatting is None:
-            return 0x00
-
-        byte = 0x00
-
-        # Map the 3270 color to EAB color.
-        if formatting.color == Color.BLUE:
-            byte |= 0x08
-        elif formatting.color == Color.RED:
-            byte |= 0x10
-        elif formatting.color == Color.PINK:
-            byte |= 0x18
-        elif formatting.color == Color.GREEN:
-            byte |= 0x20
-        elif formatting.color == Color.TURQUOISE:
-            byte |= 0x28
-        elif formatting.color == Color.YELLOW:
-            byte |= 0x30
-        elif formatting.color == Color.WHITE:
-            byte |= 0x38
-
-        # Map the 3270 highlight to EAB highlight.
-        if formatting.blink:
-            byte |= 0x40
-        elif formatting.reverse:
-            byte |= 0x80
-        elif formatting.underscore:
-            byte |= 0xc0
-
-        return byte
 
     def _format_message_area(self):
         message_area = b''
@@ -293,3 +232,61 @@ class TN3270Session(Session):
             message_area = b'\xf6\x00' + encode_string('SYSTEM')
 
         return message_area.ljust(9, b'\x00')
+
+def _map_cell(cell, has_eab):
+    regen_byte = 0x00
+
+    if isinstance(cell, AttributeCell):
+        # Only map the protected and display bits - ignore numeric, skip and modified.
+        regen_byte = 0xc0 | (cell.attribute.value & 0x2c)
+    elif isinstance(cell, CharacterCell):
+        byte = cell.byte
+
+        if cell.character_set is not None:
+            # TODO: Temporary workaround until character set support is added.
+            regen_byte = encode_ascii_character(ord('ß'))
+        elif byte == DUP:
+            regen_byte = encode_ascii_character(ord('*'))
+        elif byte == FM:
+            regen_byte = encode_ascii_character(ord(';'))
+        else:
+            regen_byte = encode_ebcdic_character(byte)
+
+    if not has_eab:
+        return (regen_byte, None)
+
+    eab_byte = _map_formatting(cell.formatting)
+
+    return (regen_byte, eab_byte)
+
+def _map_formatting(formatting):
+    if formatting is None:
+        return 0x00
+
+    byte = 0x00
+
+    # Map the 3270 color to EAB color.
+    if formatting.color == Color.BLUE:
+        byte |= 0x08
+    elif formatting.color == Color.RED:
+        byte |= 0x10
+    elif formatting.color == Color.PINK:
+        byte |= 0x18
+    elif formatting.color == Color.GREEN:
+        byte |= 0x20
+    elif formatting.color == Color.TURQUOISE:
+        byte |= 0x28
+    elif formatting.color == Color.YELLOW:
+        byte |= 0x30
+    elif formatting.color == Color.WHITE:
+        byte |= 0x38
+
+    # Map the 3270 highlight to EAB highlight.
+    if formatting.blink:
+        byte |= 0x40
+    elif formatting.reverse:
+        byte |= 0x80
+    elif formatting.underscore:
+        byte |= 0xc0
+
+    return byte

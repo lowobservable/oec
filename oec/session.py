@@ -14,5 +14,8 @@ class Session:
     def handle_key(self, key, keyboard_modifiers, scan_code):
         raise NotImplementedError
 
+    def render(self):
+        raise NotImplementedError
+
 class SessionDisconnectedError(Exception):
     pass

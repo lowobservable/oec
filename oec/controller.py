@@ -146,6 +146,8 @@ class Controller:
         self.session = None
 
     def _update_session(self, duration):
+        update_count = 0
+
         while duration > 0:
             start_time = time.perf_counter()
 
@@ -157,9 +159,13 @@ class Controller:
             for (key, events) in selected:
                 session = key.fileobj
 
-                session.handle_host()
+                if session.handle_host():
+                    update_count += 1
 
             duration -= (time.perf_counter() - start_time)
+
+        if update_count > 0:
+            self.session.render()
 
     def _handle_poll_response(self, poll_response):
         if isinstance(poll_response, KeystrokePollResponse):
@@ -189,6 +195,8 @@ class Controller:
             self.terminal.keyboard.toggle_clicker()
         elif self.session:
             self.session.handle_key(key, modifiers, scan_code)
+
+            self.session.render()
 
     def _poll(self):
         self.last_poll_time = time.perf_counter()

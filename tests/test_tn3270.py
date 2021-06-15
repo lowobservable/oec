@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import context
 
@@ -15,14 +15,6 @@ class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
         self.terminal = Mock()
 
-        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), None)
-
-        self.terminal.display.status_line = Mock()
-        self.terminal.display.move_cursor = Mock()
-        self.terminal.display.write = Mock()
-        self.terminal.display.flush = Mock()
-        self.terminal.display._load_address_counter = Mock()
-
         self.session = TN3270Session(self.terminal, 'mainframe', 23)
 
         self.telnet = Mock()
@@ -37,103 +29,12 @@ class SessionHandleHostTestCase(unittest.TestCase):
         # Act and assert
         self.assertFalse(self.session.handle_host())
 
-    def test_changes_with_no_eab_feature(self):
+    def test_changes(self):
         # Arrange
         self.session.emulator.update = Mock(return_value=True)
 
-        cells = _create_screen_cells(24, 80)
-
-        _set_attribute(cells, 0, protected=True)
-        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
-        _set_attribute(cells, 10, protected=True, intensified=True)
-        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
-        _set_attribute(cells, 32, protected=True, hidden=True)
-        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
-        _set_attribute(cells, 49, protected=False)
-        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
-        _set_attribute(cells, 61, protected=False, intensified=True)
-        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
-        _set_attribute(cells, 85, protected=False, hidden=True)
-        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
-        _set_attribute(cells, 104, protected=True)
-        _set_formatting(cells, 104, color=Color.YELLOW)
-        _set_characters(cells, 105, 'EAB'.encode('cp500'))
-        _set_formatting(cells, 105, blink=True)
-        _set_formatting(cells, 106, reverse=True)
-        _set_formatting(cells, 107, underscore=True)
-        _set_attribute(cells, 108, protected=True)
-
-        self.session.emulator.cells = cells
-        self.session.emulator.dirty = set(range(109))
-
-        self.session.emulator.cursor_address = 8
-
         # Act and assert
         self.assertTrue(self.session.handle_host())
-
-        self.terminal.display.flush.assert_called()
-
-        self.assertEqual(self.terminal.display.regen_buffer[80:189], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[189:]]))
-
-        self.terminal.display.move_cursor.assert_called_with(index=8)
-
-        self.assertFalse(self.session.emulator.dirty)
-
-    def test_changes_with_eab_feature(self):
-        # Arrange
-        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), 7)
-
-        self.terminal.display.status_line = Mock()
-        self.terminal.display.move_cursor = Mock()
-        self.terminal.display.write = Mock()
-        self.terminal.display.flush = Mock()
-        self.terminal.display._load_address_counter = Mock()
-
-        self.session.emulator.update = Mock(return_value=True)
-
-        cells = _create_screen_cells(24, 80)
-
-        _set_attribute(cells, 0, protected=True)
-        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
-        _set_attribute(cells, 10, protected=True, intensified=True)
-        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
-        _set_attribute(cells, 32, protected=True, hidden=True)
-        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
-        _set_attribute(cells, 49, protected=False)
-        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
-        _set_attribute(cells, 61, protected=False, intensified=True)
-        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
-        _set_attribute(cells, 85, protected=False, hidden=True)
-        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
-        _set_attribute(cells, 104, protected=True)
-        _set_formatting(cells, 104, color=Color.YELLOW)
-        _set_characters(cells, 105, 'EAB'.encode('cp500'))
-        _set_formatting(cells, 105, blink=True)
-        _set_formatting(cells, 106, reverse=True)
-        _set_formatting(cells, 107, underscore=True)
-        _set_attribute(cells, 108, protected=True)
-
-        self.session.emulator.cells = cells
-        self.session.emulator.dirty = set(range(109))
-
-        self.session.emulator.cursor_address = 8
-
-        # Act and assert
-        self.assertTrue(self.session.handle_host())
-
-        self.terminal.display.flush.assert_called()
-
-        self.assertEqual(self.terminal.display.regen_buffer[80:189], bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.regen_buffer[189:]]))
-
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[:184]]))
-        self.assertEqual(self.terminal.display.eab_buffer[184:189], bytes.fromhex('304080c000'))
-        self.assertTrue(all([byte == 0x00 for byte in self.terminal.display.eab_buffer[189:]]))
-
-        self.terminal.display.move_cursor.assert_called_with(index=8)
-
-        self.assertFalse(self.session.emulator.dirty)
 
     def test_eof(self):
         # Arrange
@@ -154,19 +55,6 @@ class SessionHandleHostTestCase(unittest.TestCase):
             self.session.handle_host()
 
         self.telnet.close.assert_called()
-
-    def test_keyboard_locked(self):
-        # Arrange
-        self.session.emulator.update = Mock(return_value=True)
-
-        self.session.emulator.cells = _create_screen_cells(24, 80)
-        self.session.emulator.dirty = set()
-
-        # Act
-        self.session.handle_host()
-
-        # Assert
-        self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600b2b8b2b3a4ac00'))
 
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):
@@ -304,22 +192,192 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
         self.session.emulator.input.assert_called_with(0x81, True)
 
-    def test_protected_cell_operator_error(self):
+    def test_operator_error(self):
         # Arrange
         self.session.emulator.input = Mock(side_effect=ProtectedCellOperatorError)
 
+        self.assertIsNone(self.session.operator_error)
+
         # Act
         self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.assertIsInstance(self.session.operator_error, ProtectedCellOperatorError)
+
+class SessionRenderTestCase(unittest.TestCase):
+    def setUp(self):
+        self.terminal = Mock()
+
+        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), None)
+
+        self.terminal.display.buffered_write_byte = Mock(wraps=self.terminal.display.buffered_write_byte)
+        self.terminal.display.move_cursor = Mock(wraps=self.terminal.display.move_cursor)
+        self.terminal.display.flush = Mock(wraps=self.terminal.display.flush)
+        self.terminal.display.status_line.write = Mock(wraps=self.terminal.display.status_line.write)
+
+        self.session = TN3270Session(self.terminal, 'mainframe', 23)
+
+        self.telnet = Mock()
+
+        self.session.telnet = self.telnet
+        self.session.emulator = Mock()
+
+        patcher = patch('oec.display.read_address_counter_hi')
+
+        self.read_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.read_address_counter_lo')
+
+        self.read_address_counter_lo_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_hi')
+
+        self.load_address_counter_hi_mock = patcher.start()
+
+        patcher = patch('oec.display.load_address_counter_lo')
+
+        self.load_address_counter_lo_mock = patcher.start()
+
+        patcher = patch('oec.display.write_data')
+
+        self.write_data_mock = patcher.start()
+
+        patcher = patch('oec.display.eab_write_alternate')
+
+        self.eab_write_alternate_mock = patcher.start()
+
+        self.addCleanup(patch.stopall)
+
+    def test_with_no_eab_feature(self):
+        # Arrange
+        cells = _create_screen_cells(24, 80)
+
+        _set_attribute(cells, 0, protected=True)
+        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
+        _set_attribute(cells, 10, protected=True, intensified=True)
+        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
+        _set_attribute(cells, 32, protected=True, hidden=True)
+        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
+        _set_attribute(cells, 49, protected=False)
+        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
+        _set_attribute(cells, 61, protected=False, intensified=True)
+        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
+        _set_attribute(cells, 85, protected=False, hidden=True)
+        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
+        _set_attribute(cells, 104, protected=True)
+        _set_formatting(cells, 104, color=Color.YELLOW)
+        _set_characters(cells, 105, 'EAB'.encode('cp500'))
+        _set_formatting(cells, 105, blink=True)
+        _set_formatting(cells, 106, reverse=True)
+        _set_formatting(cells, 107, underscore=True)
+        _set_attribute(cells, 108, protected=True)
+
+        self.session.emulator.cells = cells
+        self.session.emulator.dirty = set(range(109))
+        self.session.emulator.cursor_address = 8
+
+        # Act
+        self.session.render()
+
+        # Assert
+        regen_bytes = bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0')
+
+        for (index, regen_byte) in enumerate(regen_bytes):
+            self.terminal.display.buffered_write_byte.assert_any_call(regen_byte, None, index=index)
+
+        self.terminal.display.flush.assert_called()
+
+        self.terminal.display.move_cursor.assert_called_with(index=8)
+
+        self.assertFalse(self.session.emulator.dirty)
+
+    def test_with_eab_feature(self):
+        # Arrange
+        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), 7)
+
+        self.terminal.display.buffered_write_byte = Mock(wraps=self.terminal.display.buffered_write_byte)
+        self.terminal.display.move_cursor = Mock(wraps=self.terminal.display.move_cursor)
+        self.terminal.display.flush = Mock(wraps=self.terminal.display.flush)
+
+        cells = _create_screen_cells(24, 80)
+
+        _set_attribute(cells, 0, protected=True)
+        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
+        _set_attribute(cells, 10, protected=True, intensified=True)
+        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
+        _set_attribute(cells, 32, protected=True, hidden=True)
+        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
+        _set_attribute(cells, 49, protected=False)
+        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
+        _set_attribute(cells, 61, protected=False, intensified=True)
+        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
+        _set_attribute(cells, 85, protected=False, hidden=True)
+        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
+        _set_attribute(cells, 104, protected=True)
+        _set_formatting(cells, 104, color=Color.YELLOW)
+        _set_characters(cells, 105, 'EAB'.encode('cp500'))
+        _set_formatting(cells, 105, blink=True)
+        _set_formatting(cells, 106, reverse=True)
+        _set_formatting(cells, 107, underscore=True)
+        _set_attribute(cells, 108, protected=True)
+
+        self.session.emulator.cells = cells
+        self.session.emulator.dirty = set(range(109))
+        self.session.emulator.cursor_address = 8
+
+        # Act
+        self.session.render()
+
+        # Assert
+        regen_bytes = bytes.fromhex('e0afb1aeb3a4a2b3a4a3e8afb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ecafb1aeb3a4a2b3a4a300a7a8a3a3a4adc0b4adafb1aeb3a4a2b3a4a3c8b4adafb1aeb3a4a2b3a4a300a8adb3a4adb2a8a5a8a4a3ccb4adafb1aeb3a4a2b3a4a300a7a8a3a3a4ade0a4a0a1e0')
+        eab_bytes = bytes.fromhex('0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000304080c000')
+
+        for (index, (regen_byte, eab_byte)) in enumerate(zip(regen_bytes, eab_bytes)):
+            self.terminal.display.buffered_write_byte.assert_any_call(regen_byte, eab_byte, index=index)
+
+        self.terminal.display.flush.assert_called()
+
+        self.terminal.display.move_cursor.assert_called_with(index=8)
+
+        self.assertFalse(self.session.emulator.dirty)
+
+    def test_keyboard_locked(self):
+        # Arrange
+        self.session.emulator.cells = _create_screen_cells(24, 80)
+        self.session.emulator.dirty = set()
+        self.session.emulator.cursor_address = 8
+        self.session.emulator.keyboard_locked = True
+
+        # Act
+        self.session.render()
+
+        # Assert
+        self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600b2b8b2b3a4ac00'))
+
+    def test_protected_cell_operator_error(self):
+        # Arrange
+        self.session.emulator.cells = _create_screen_cells(24, 80)
+        self.session.emulator.dirty = set()
+        self.session.emulator.cursor_address = 8
+
+        self.session.operator_error = ProtectedCellOperatorError()
+
+        # Act
+        self.session.render()
 
         # Assert
         self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600f8dbd800000000'))
 
     def test_field_overflow_operator_error(self):
         # Arrange
-        self.session.emulator.input = Mock(side_effect=FieldOverflowOperatorError)
+        self.session.emulator.cells = _create_screen_cells(24, 80)
+        self.session.emulator.dirty = set()
+        self.session.emulator.cursor_address = 8
+
+        self.session.operator_error = FieldOverflowOperatorError()
 
         # Act
-        self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
+        self.session.render()
 
         # Assert
         self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600db080000000000'))
