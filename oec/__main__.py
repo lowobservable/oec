@@ -31,6 +31,9 @@ def _get_keymap(terminal_id, extended_id):
     if extended_id == 'c1348300':
         keymap = KEYMAP_3483
 
+    if extended_id == 'c1347200':
+        keymap = KEYMAP_3483
+
     return keymap
 
 @contextmanager
