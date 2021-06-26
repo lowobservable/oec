@@ -1,11 +1,8 @@
 import os
-import time
 import signal
 import logging
 import argparse
-from contextlib import contextmanager
-from serial import Serial
-from coax import SerialInterface
+from coax import open_serial_interface
 
 from .controller import Controller
 from .tn3270 import TN3270Session
@@ -35,23 +32,6 @@ def _get_keymap(terminal_id, extended_id):
         keymap = KEYMAP_3483
 
     return keymap
-
-@contextmanager
-def _create_interface(args):
-    with Serial(args.serial_port, 115200) as serial:
-        serial.reset_input_buffer()
-        serial.reset_output_buffer()
-
-        # Allow the interface firmware time to start, this is only required for the
-        # original Arduino Mega based interface.
-        if 'COAX_FAST_START' not in os.environ:
-            time.sleep(3)
-
-        interface = SerialInterface(serial)
-
-        interface.reset()
-
-        yield interface
 
 def _create_session(args, terminal):
     if args.emulator == 'tn3270':
@@ -104,7 +84,7 @@ def main():
 
     args = parser.parse_args()
 
-    with _create_interface(args) as interface:
+    with open_serial_interface(args.serial_port) as interface:
         create_session = lambda terminal: _create_session(args, terminal)
 
         controller = Controller(interface, _get_keymap, create_session)
