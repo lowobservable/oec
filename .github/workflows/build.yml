@@ -15,6 +15,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pylint
           pip install -r requirements.txt --no-deps
+      - name: Run linter
+        run: pylint -E oec
       - name: Run unit tests
         run: ./run_unit_tests.sh

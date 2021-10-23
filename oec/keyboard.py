@@ -4,7 +4,8 @@ oec.keyboard
 """
 
 from enum import Enum, Flag, auto
-from collections import namedtuple, Mapping
+from collections import namedtuple
+from collections.abc import Mapping
 
 class KeyboardModifiers(Flag):
     """Keyboard modifiers."""
