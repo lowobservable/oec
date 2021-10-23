@@ -3,14 +3,13 @@ oec.terminal
 ~~~~~~~~~~~~
 """
 
-import os
 import time
 import logging
-from textwrap import dedent
-from coax import poll, read_terminal_id, read_extended_id, get_features, \
-                 load_control_register, TerminalType, Feature, PollAction, Control, \
-                 ReceiveError, ProtocolError
+from coax import read_feature_ids, parse_features, Poll, ReadTerminalId, ReadExtendedId, \
+                 LoadControlRegister, TerminalType, Feature, PollAction, Control, \
+                 ProtocolError
 
+from .interface import address_commands
 from .display import Dimensions, BufferedDisplay
 from .keyboard import Keyboard
 
@@ -26,9 +25,10 @@ MODEL_DIMENSIONS = {
 class Terminal:
     """The terminal."""
 
-    def __init__(self, interface, terminal_id, extended_id, dimensions, features,
-                 keymap, jumbo_write_strategy=None):
+    def __init__(self, interface, device_address, terminal_id, extended_id, dimensions,
+                 features, keymap):
         self.interface = interface
+        self.device_address = device_address
         self.terminal_id = terminal_id
         self.extended_id = extended_id
         self.features = features
@@ -37,8 +37,7 @@ class Terminal:
                                cursor_inhibit=False, cursor_reverse=False,
                                cursor_blink=False)
 
-        self.display = BufferedDisplay(self, dimensions, features.get(Feature.EAB),
-                                       jumbo_write_strategy=jumbo_write_strategy)
+        self.display = BufferedDisplay(self, dimensions, features.get(Feature.EAB))
         self.keyboard = Keyboard(keymap)
 
         self.alarm = False
@@ -53,7 +52,7 @@ class Terminal:
 
         self.display.clear(clear_status_line=True)
 
-    def poll(self, **kwargs):
+    def poll(self):
         """Execute a POLL command with queued actions."""
         poll_action = PollAction.NONE
 
@@ -66,7 +65,7 @@ class Terminal:
             else:
                 poll_action = PollAction.DISABLE_KEYBOARD_CLICKER
 
-        poll_response = poll(self.interface, poll_action, **kwargs)
+        poll_response = self.execute(Poll(poll_action))
 
         # Clear the queued alarm and keyboard clicker change if the POLL was
         # successful.
@@ -84,17 +83,18 @@ class Terminal:
 
     def load_control_register(self):
         """Execute a LOAD_CONTROL_REGISTER command."""
-        load_control_register(self.interface, self.control)
+        self.execute(LoadControlRegister(self.control))
+
+    def execute(self, commands):
+        return self.interface.execute(address_commands(self.device_address, commands))
 
 class UnsupportedTerminalError(Exception):
     """Unsupported terminal."""
 
-def create_terminal(interface, poll_response, get_keymap):
+def create_terminal(interface, device_address, poll_response, get_keymap):
     """Terminal factory."""
-    jumbo_write_strategy = _get_jumbo_write_strategy()
-
     # Read the terminal identifiers.
-    (terminal_id, extended_id) = _read_terminal_ids(interface)
+    (terminal_id, extended_id) = _read_terminal_ids(interface, device_address)
 
     logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
 
@@ -110,15 +110,9 @@ def create_terminal(interface, poll_response, get_keymap):
     logger.info(f'Rows = {dimensions.rows}, Columns = {dimensions.columns}')
 
     # Get the terminal features.
-    features = get_features(interface)
+    features = _get_features(interface, device_address)
 
     logger.info(f'Features = {features}')
-
-    if Feature.EAB in features:
-        if interface.legacy_firmware_detected and jumbo_write_strategy is None:
-            del features[Feature.EAB]
-
-            _print_no_i1_eab_notice()
 
     # Get the keymap.
     keymap = get_keymap(terminal_id, extended_id)
@@ -126,19 +120,17 @@ def create_terminal(interface, poll_response, get_keymap):
     logger.info(f'Keymap = {keymap.name}')
 
     # Create the terminal.
-    terminal = Terminal(interface, terminal_id, extended_id, dimensions, features,
-                        keymap, jumbo_write_strategy=jumbo_write_strategy)
+    terminal = Terminal(interface, device_address, terminal_id, extended_id, dimensions,
+                        features, keymap)
 
     return terminal
 
-def _read_terminal_ids(interface, extended_id_retry_attempts=3):
+def _read_terminal_ids(interface, device_address, extended_id_retry_attempts=3):
     terminal_id = None
     extended_id = None
 
     try:
-        terminal_id = read_terminal_id(interface)
-    except ReceiveError as error:
-        logger.warning(f'READ_TERMINAL_ID receive error: {error}', exc_info=error)
+        terminal_id = interface.execute(address_commands(device_address, ReadTerminalId()))
     except ProtocolError as error:
         logger.warning(f'READ_TERMINAL_ID protocol error: {error}', exc_info=error)
 
@@ -148,11 +140,9 @@ def _read_terminal_ids(interface, extended_id_retry_attempts=3):
 
     for attempt in range(extended_id_retry_attempts):
         try:
-            extended_id = read_extended_id(interface)
+            extended_id = interface.execute(address_commands(device_address, ReadExtendedId()))
 
             break
-        except ReceiveError as error:
-            logger.warning(f'READ_EXTENDED_ID receive error: {error}', exc_info=error)
         except ProtocolError as error:
             logger.warning(f'READ_EXTENDED_ID protocol error: {error}', exc_info=error)
 
@@ -160,44 +150,9 @@ def _read_terminal_ids(interface, extended_id_retry_attempts=3):
 
     return (terminal_id, extended_id.hex() if extended_id is not None else None)
 
-def _get_jumbo_write_strategy():
-    value = os.environ.get('COAX_JUMBO')
+def _get_features(interface, device_address):
+    commands = read_feature_ids()
 
-    if value is None:
-        return None
+    ids = interface.execute([address_commands(device_address, command) for command in commands])
 
-    if value in ['split', 'ignore']:
-        return value
-
-    logger.warning(f'Unsupported COAX_JUMBO option: {value}')
-
-    return None
-
-def _print_no_i1_eab_notice():
-    notice = '''
-    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
-
-    Your terminal is reporting the existence of an EAB feature that allows extended
-    colors and formatting, however...
-
-    I think you are using an older firmware on the 1st generation, Arduino Mega
-    based, interface which does not support the "jumbo write" required to write a
-    full screen to the regen and EAB buffers.
-
-    I'm going to continue as if the EAB feature did not exist...
-
-    If you want to override this behavior, you can set the COAX_JUMBO environment
-    variable as follows:
-
-    - COAX_JUMBO=split  - split large writes into multiple smaller 32-byte writes
-                          before sending to the interface, this will result in
-                          additional round trips to the interface which may
-                          manifest as visible incremental changes being applied
-                          to the screen
-    - COAX_JUMBO=ignore - try a jumbo write, anyway, use this option if you
-                          believe you are seeing this behavior in error
-
-    **** **** **** **** **** **** **** **** **** **** **** **** **** **** **** ****
-    '''
-
-    print(dedent(notice))
+    return parse_features(ids, commands)

@@ -8,21 +8,19 @@ from itertools import zip_longest
 import logging
 from more_itertools import interleave
 from sortedcontainers import SortedSet
-from coax import read_address_counter_hi, read_address_counter_lo, \
-                 load_address_counter_hi, load_address_counter_lo, write_data, \
-                 eab_load_mask, eab_write_alternate
+from coax import ReadAddressCounterHi, ReadAddressCounterLo, LoadAddressCounterHi, \
+                 LoadAddressCounterLo, WriteData, EABLoadMask, EABWriteAlternate, Data
 
 # Does not include the status line row.
 Dimensions = namedtuple('Dimensions', ['rows', 'columns'])
 
 class Display:
-    def __init__(self, terminal, dimensions, eab_address, jumbo_write_strategy=None):
+    def __init__(self, terminal, dimensions, eab_address):
         self.logger = logging.getLogger(__name__)
 
         self.terminal = terminal
         self.dimensions = dimensions
         self.eab_address = eab_address
-        self.jumbo_write_strategy = jumbo_write_strategy
 
         self.address_counter = None
         self.last_address = ((dimensions.rows + 1) * dimensions.columns) - 1
@@ -109,7 +107,7 @@ class Display:
         if not self.has_eab:
             raise RuntimeError('No EAB feature')
 
-        eab_load_mask(self.terminal.interface, self.eab_address, mask)
+        self.terminal.execute(EABLoadMask(self.eab_address, mask))
 
     def toggle_cursor_blink(self):
         self.terminal.control.cursor_blink = not self.terminal.control.cursor_blink
@@ -149,8 +147,7 @@ class Display:
         return address
 
     def _read_address_counter(self):
-        hi = read_address_counter_hi(self.terminal.interface)
-        lo = read_address_counter_lo(self.terminal.interface)
+        [hi, lo] = self.terminal.execute([ReadAddressCounterHi(), ReadAddressCounterLo()])
 
         self.address_counter = (hi << 8) | lo
 
@@ -163,21 +160,41 @@ class Display:
         (hi, lo) = _split_address(address)
         (current_hi, current_lo) = _split_address(self.address_counter)
 
+        commands = []
+
         if hi != current_hi or force_load:
-            load_address_counter_hi(self.terminal.interface, hi)
+            commands.append(LoadAddressCounterHi(hi))
 
         if lo != current_lo or force_load:
-            load_address_counter_lo(self.terminal.interface, lo)
+            commands.append(LoadAddressCounterLo(lo))
+
+        self.terminal.execute(commands)
 
         self.address_counter = address
 
         return True
 
     def _write_data(self, data):
-        write_data(self.terminal.interface, data, jumbo_write_strategy=self.jumbo_write_strategy)
+        chunks = self.terminal.interface.jumbo_write_split_data(data, -1)
+
+        commands = [WriteData(chunks[0])]
+
+        for chunk in chunks[1:]:
+            commands.append(Data(chunk))
+
+        self.terminal.execute(WriteData(data))
 
     def _eab_write_alternate(self, data):
-        eab_write_alternate(self.terminal.interface, self.eab_address, data, jumbo_write_strategy=self.jumbo_write_strategy)
+        # The EAB_WRITE_ALTERNATE command data must be split so that the two bytes
+        # do not get separated, otherwise the write will be incorrect.
+        chunks = self.terminal.interface.jumbo_write_split_data(data, -2)
+
+        commands = [EABWriteAlternate(self.eab_address, chunks[0])]
+
+        for chunk in chunks[1:]:
+            commands.append(Data(chunk))
+
+        self.terminal.execute(commands)
 
 def _split_address(address):
     if address is None:
@@ -220,8 +237,8 @@ class StatusLine:
         self.write(45, indicators)
 
 class BufferedDisplay(Display):
-    def __init__(self, terminal, dimensions, eab_address, jumbo_write_strategy=None):
-        super().__init__(terminal, dimensions, eab_address, jumbo_write_strategy)
+    def __init__(self, terminal, dimensions, eab_address):
+        super().__init__(terminal, dimensions, eab_address)
 
         length = (self.dimensions.rows + 1) * self.dimensions.columns
 

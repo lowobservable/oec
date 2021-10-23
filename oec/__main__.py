@@ -4,6 +4,7 @@ import logging
 import argparse
 from coax import open_serial_interface
 
+from .interface import InterfaceWrapper
 from .controller import Controller
 from .tn3270 import TN3270Session
 
@@ -87,7 +88,7 @@ def main():
     with open_serial_interface(args.serial_port) as interface:
         create_session = lambda terminal: _create_session(args, terminal)
 
-        controller = Controller(interface, _get_keymap, create_session)
+        controller = Controller(InterfaceWrapper(interface), _get_keymap, create_session)
 
         print('Starting controller...')
 

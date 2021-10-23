@@ -1,26 +1,35 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, create_autospec
 
-import context
-
-from oec.session import SessionDisconnectedError
-from oec.display import Dimensions, BufferedDisplay
-from oec.keyboard import Key, KeyboardModifiers
-from oec.tn3270 import TN3270Session
-from tn3270 import AttributeCell, CharacterCell, AID, Color, ProtectedCellOperatorError, FieldOverflowOperatorError
+from coax.protocol import TerminalId
+from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, Color, ProtectedCellOperatorError, FieldOverflowOperatorError
 from tn3270.attributes import Attribute
 from tn3270.emulator import CellFormatting
 
+import context
+
+from oec.interface import InterfaceWrapper
+from oec.terminal import Terminal
+from oec.display import Dimensions, BufferedDisplay, StatusLine
+from oec.keyboard import Key, KeyboardModifiers
+from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from oec.session import SessionDisconnectedError
+from oec.tn3270 import TN3270Session
+
+from mock_interface import MockInterface
+
 class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
+
+        self.terminal = _create_terminal(self.interface)
 
         self.session = TN3270Session(self.terminal, 'mainframe', 23)
 
-        self.telnet = Mock()
+        self.telnet = create_autospec(Telnet, instance=True)
 
         self.session.telnet = self.telnet
-        self.session.emulator = Mock()
+        self.session.emulator = create_autospec(Emulator, instance=True)
 
     def test_no_changes(self):
         # Arrange
@@ -58,11 +67,13 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
+
+        self.terminal = _create_terminal(self.interface)
 
         self.session = TN3270Session(self.terminal, 'mainframe', 23)
 
-        self.session.emulator = Mock()
+        self.session.emulator = create_autospec(Emulator, instance=True)
 
         self.session.emulator.cells = []
         self.session.emulator.dirty = set()
@@ -206,9 +217,9 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
 class SessionRenderTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), None)
+        self.terminal = _create_terminal(self.interface)
 
         self.terminal.display.buffered_write_byte = Mock(wraps=self.terminal.display.buffered_write_byte)
         self.terminal.display.move_cursor = Mock(wraps=self.terminal.display.move_cursor)
@@ -217,36 +228,10 @@ class SessionRenderTestCase(unittest.TestCase):
 
         self.session = TN3270Session(self.terminal, 'mainframe', 23)
 
-        self.telnet = Mock()
+        self.session.telnet = create_autospec(Telnet, instance=True)
+        self.session.emulator = create_autospec(Emulator, instance=True)
 
-        self.session.telnet = self.telnet
-        self.session.emulator = Mock()
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.session.emulator.keyboard_locked = False
 
     def test_with_no_eab_feature(self):
         # Arrange
@@ -381,6 +366,19 @@ class SessionRenderTestCase(unittest.TestCase):
 
         # Assert
         self.terminal.display.status_line.write.assert_called_with(8, bytes.fromhex('f600db080000000000'))
+
+def _create_terminal(interface):
+    terminal_id = TerminalId(0b11110100)
+    extended_id = 'c1348300'
+    dimensions = Dimensions(24, 80)
+    features = { }
+    keymap = KEYMAP_3278_2
+
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+
+    terminal.display.status_line = create_autospec(StatusLine, instance=True)
+
+    return terminal
 
 def _create_screen_cells(rows, columns):
     return [CharacterCell(0x00) for address in range(rows * columns)]

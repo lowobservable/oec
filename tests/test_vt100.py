@@ -1,22 +1,33 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, create_autospec
+
+from logging import Logger
+from ptyprocess import PtyProcess
+from coax.protocol import TerminalId
 
 import context
 
-from oec.session import SessionDisconnectedError
+from oec.interface import InterfaceWrapper
+from oec.terminal import Terminal
 from oec.display import Dimensions, BufferedDisplay
 from oec.keyboard import Key, KeyboardModifiers
+from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from oec.session import SessionDisconnectedError
 from oec.vt100 import VT100Session
+
+from mock_interface import MockInterface
 
 class SessionHandleHostTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        self.terminal.display.dimensions = Dimensions(24, 80)
+        self.terminal = _create_terminal(self.interface)
+
+        self.terminal.sound_alarm = Mock(wraps=self.terminal.sound_alarm)
 
         self.session = VT100Session(self.terminal, None)
 
-        self.session.host_process = Mock()
+        self.session.host_process = create_autospec(PtyProcess, instance=True)
 
     def test(self):
         # Arrange
@@ -54,13 +65,13 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
 class SessionHandleKeyTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        self.terminal.display.dimensions = Dimensions(24, 80)
+        self.terminal = _create_terminal(self.interface)
 
         self.session = VT100Session(self.terminal, None)
 
-        self.session.host_process = Mock()
+        self.session.host_process = create_autospec(PtyProcess, instance=True)
 
     def test_printable(self):
         # Act
@@ -87,7 +98,7 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
     def test_unmapped_alt_modifier(self):
         # Arrange
-        self.session.logger = Mock()
+        self.session.logger = create_autospec(Logger, instance=True)
 
         # Act
         self.session.handle_key(Key.THREE, KeyboardModifiers.LEFT_ALT, None)
@@ -106,9 +117,9 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
 class SessionRenderTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        self.terminal.display = BufferedDisplay(self.terminal, Dimensions(24, 80), None)
+        self.terminal = _create_terminal(self.interface)
 
         self.terminal.display.buffered_write_byte = Mock(wraps=self.terminal.display.buffered_write_byte)
         self.terminal.display.move_cursor = Mock(wraps=self.terminal.display.move_cursor)
@@ -116,33 +127,7 @@ class SessionRenderTestCase(unittest.TestCase):
 
         self.session = VT100Session(self.terminal, None)
 
-        self.session.host_process = Mock()
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.session.host_process = create_autospec(PtyProcess, instance=True)
 
     def test_with_no_eab_feature(self):
         # Arrange
@@ -189,3 +174,14 @@ class SessionRenderTestCase(unittest.TestCase):
         self.terminal.display.move_cursor.assert_called_with(row=0, column=3)
 
         self.assertFalse(self.session.vt100_screen.dirty)
+
+def _create_terminal(interface):
+    terminal_id = TerminalId(0b11110100)
+    extended_id = 'c1348300'
+    dimensions = Dimensions(24, 80)
+    features = { }
+    keymap = KEYMAP_3278_2
+
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+
+    return terminal

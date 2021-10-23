@@ -1,68 +1,49 @@
 import unittest
-from unittest.mock import Mock, patch
-from coax import Feature, PollAction
-from coax.protocol import TerminalId, TerminalType
+from unittest.mock import Mock, create_autospec
+from coax import Poll, PollAction, TerminalType, Feature, ReadTerminalId, ReadExtendedId, ReadFeatureId
+from coax.protocol import TerminalId
 
 import context
 
+from oec.interface import InterfaceWrapper
 from oec.terminal import create_terminal, Terminal, UnsupportedTerminalError
-from oec.display import Dimensions
+from oec.display import Display, Dimensions
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+
+from mock_interface import MockInterface
 
 class TerminalSetupTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.interface = MockInterface()
 
-        terminal_id = TerminalId(0b11110100)
-        extended_id = 'c1348300'
-        dimensions = Dimensions(24, 80)
-        features = { }
-        keymap = KEYMAP_3278_2
+        self.terminal = _create_terminal(self.interface)
 
-        self.terminal = Terminal(self.interface, terminal_id, extended_id, dimensions, features, keymap)
-
-        self.terminal.display = Mock()
-
-        patcher = patch('oec.terminal.load_control_register')
-
-        self.load_control_register_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.terminal.display = create_autospec(Display, instance=True)
 
     def test(self):
         self.terminal.setup()
 
 class TerminalPollTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
+        self.interface = MockInterface()
 
-        terminal_id = TerminalId(0b11110100)
-        extended_id = 'c1348300'
-        dimensions = Dimensions(24, 80)
-        features = { }
-        keymap = KEYMAP_3278_2
+        self.terminal = _create_terminal(self.interface)
 
-        self.terminal = Terminal(self.interface, terminal_id, extended_id, dimensions, features, keymap)
-
-        patcher = patch('oec.terminal.poll')
-
-        self.poll_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.terminal.display = create_autospec(Display, instance=True)
 
         # The terminal will be initialized in a state where the terminal keyboard clicker
         # state is unknown, and this cannot be read. Therefore the first POLL will always
         # attempt to set the keyboard clicker state...
         self.terminal.poll()
 
-        self.poll_mock.reset_mock()
+        self.interface.reset_mock()
 
     def test_with_no_queued_actions(self):
         # Act
         self.terminal.poll()
 
         # Assert
-        self.poll_mock.assert_called_with(self.interface, PollAction.NONE)
+        self.assert_poll_with_poll_action(PollAction.NONE)
 
     def test_with_sound_alarm_queued(self):
         # Arrange
@@ -72,7 +53,7 @@ class TerminalPollTestCase(unittest.TestCase):
         self.terminal.poll()
 
         # Assert
-        self.poll_mock.assert_called_with(self.interface, PollAction.ALARM)
+        self.assert_poll_with_poll_action(PollAction.ALARM)
 
     def test_with_enable_keyboard_clicker_queued(self):
         # Arrange
@@ -84,38 +65,29 @@ class TerminalPollTestCase(unittest.TestCase):
         self.terminal.poll()
 
         # Assert
-        self.poll_mock.assert_called_with(self.interface, PollAction.ENABLE_KEYBOARD_CLICKER)
+        self.assert_poll_with_poll_action(PollAction.ENABLE_KEYBOARD_CLICKER)
+
+    def assert_poll_with_poll_action(self, action):
+        self.interface.assert_command_executed(None, Poll, lambda command: command.action == action)
 
 class CreateTerminalTestCase(unittest.TestCase):
     def setUp(self):
-        self.interface = Mock()
-
-        self.interface.legacy_firmware_detected = False
+        self.interface = MockInterface()
 
         self.get_keymap = lambda terminal_id, extended_id: KEYMAP_3278_2
 
-        patcher = patch('oec.terminal.read_terminal_id')
-
-        self.read_terminal_id_mock = patcher.start()
-
-        patcher = patch('oec.terminal.read_extended_id')
-
-        self.read_extended_id_mock = patcher.start()
-
-        patcher = patch('oec.terminal.get_features')
-
-        self.get_features_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
-
     def test_supported_terminal(self):
         # Arrange
-        self.read_terminal_id_mock.return_value = TerminalId(0b11110100)
-        self.read_extended_id_mock.return_value = bytes.fromhex('c1 34 83 00')
-        self.get_features_mock.return_value = { Feature.EAB: 7 }
+        interface = InterfaceWrapper(self.interface)
+
+        self.interface.mock_responses = [
+            (None, ReadTerminalId, None, TerminalId(0b11110100)),
+            (None, ReadExtendedId, None, bytes.fromhex('c1 34 83 00')),
+            (None, ReadFeatureId, lambda command: command.feature_address == 7, Feature.EAB.value)
+        ]
 
         # Act
-        terminal = create_terminal(self.interface, None, self.get_keymap)
+        terminal = create_terminal(interface, None, None, self.get_keymap)
 
         # Assert
         self.assertEqual(terminal.terminal_id.type, TerminalType.CUT)
@@ -128,46 +100,34 @@ class CreateTerminalTestCase(unittest.TestCase):
 
     def test_unsupported_terminal_type(self):
         # Arrange
-        self.read_terminal_id_mock.return_value = TerminalId(0b00000001)
+        interface = InterfaceWrapper(self.interface)
+
+        self.interface.mock_responses = [(None, ReadTerminalId, None, TerminalId(0b00000001))]
 
         # Act and assert
         with self.assertRaises(UnsupportedTerminalError):
-            create_terminal(self.interface, None, self.get_keymap)
+            create_terminal(interface, None, None, self.get_keymap)
 
     def test_unsupported_terminal_model(self):
         # Arrange
+        interface = InterfaceWrapper(self.interface)
         terminal_id = TerminalId(0b11110100)
 
         terminal_id.model = 1
 
-        self.read_terminal_id_mock.return_value = terminal_id
+        self.interface.mock_responses = [(None, ReadTerminalId, None, terminal_id)]
 
         # Act and assert
         with self.assertRaises(UnsupportedTerminalError):
-            create_terminal(self.interface, None, self.get_keymap)
+            create_terminal(interface, None, None, self.get_keymap)
 
-    def test_eab_feature_removed_on_legacy_interface_without_strategy(self):
-        # Arrange
-        self.interface.legacy_firmware_detected = True
+def _create_terminal(interface):
+    terminal_id = TerminalId(0b11110100)
+    extended_id = 'c1348300'
+    dimensions = Dimensions(24, 80)
+    features = { }
+    keymap = KEYMAP_3278_2
 
-        self.read_terminal_id_mock.return_value = TerminalId(0b11110100)
-        self.read_extended_id_mock.return_value = bytes.fromhex('c1 34 83 00')
-        self.get_features_mock.return_value = { Feature.EAB: 7 }
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
 
-        patcher = patch('oec.terminal._print_no_i1_eab_notice')
-
-        print_no_i1_eab_notice_mock = patcher.start()
-
-        # Act
-        terminal = create_terminal(self.interface, None, self.get_keymap)
-
-        # Assert
-        self.assertEqual(terminal.terminal_id.type, TerminalType.CUT)
-        self.assertEqual(terminal.terminal_id.model, 2)
-        self.assertEqual(terminal.terminal_id.keyboard, 15)
-        self.assertEqual(terminal.extended_id, 'c1348300')
-        self.assertEqual(terminal.display.dimensions, Dimensions(24, 80))
-        self.assertEqual(terminal.features, { })
-        self.assertEqual(terminal.keyboard.keymap.name, '3278-2')
-
-        print_no_i1_eab_notice_mock.assert_called_once()
+    return terminal

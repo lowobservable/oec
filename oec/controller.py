@@ -6,9 +6,10 @@ oec.controller
 import time
 import logging
 import selectors
-from coax import poll, poll_ack, KeystrokePollResponse, ReceiveTimeout, \
+from coax import Poll, PollAck, KeystrokePollResponse, ReceiveTimeout, \
                  ReceiveError, ProtocolError
 
+from .interface import address_commands
 from .terminal import create_terminal, UnsupportedTerminalError
 from .keyboard import Key
 from .session import SessionDisconnectedError
@@ -64,6 +65,8 @@ class Controller:
         self.running = False
 
     def _run_loop(self):
+        device_address = None
+
         poll_delay = self._calculate_poll_delay(time.perf_counter())
 
         # If POLLing is delayed, handle the host output, otherwise just sleep.
@@ -77,7 +80,7 @@ class Controller:
                 time.sleep(poll_delay)
 
         try:
-            poll_response = self._poll()
+            poll_response = self._poll(device_address)
         except ReceiveTimeout:
             if self.terminal:
                 self._handle_terminal_detached()
@@ -92,7 +95,7 @@ class Controller:
 
         if not self.terminal:
             try:
-                self._handle_terminal_attached(poll_response)
+                self._handle_terminal_attached(device_address, poll_response)
             except UnsupportedTerminalError as error:
                 self.logger.error(f'Unsupported terminal: {error}')
                 return
@@ -100,10 +103,11 @@ class Controller:
         if poll_response:
             self._handle_poll_response(poll_response)
 
-    def _handle_terminal_attached(self, poll_response):
+    def _handle_terminal_attached(self, device_address, poll_response):
         self.logger.info('Terminal attached')
 
-        self.terminal = create_terminal(self.interface, poll_response, self.get_keymap)
+        self.terminal = create_terminal(self.interface, device_address, poll_response,
+                                        self.get_keymap)
 
         self.terminal.setup()
 
@@ -198,21 +202,19 @@ class Controller:
 
             self.session.render()
 
-    def _poll(self):
+    def _poll(self, device_address):
         self.last_poll_time = time.perf_counter()
 
         # If a terminal is connected, use the terminal method to ensure that
         # any queued POLL action is applied.
         if self.terminal:
-            poll_response = self.terminal.poll(receive_timeout=1)
+            poll_response = self.terminal.poll()
         else:
-            poll_response = poll(self.interface, receive_timeout=1)
+            poll_response = self.interface.execute(address_commands(device_address, Poll()))
 
         if poll_response:
             try:
-                poll_ack(self.interface)
-            except ReceiveError as error:
-                self.logger.warning(f'POLL_ACK receive error: {error}', exc_info=error)
+                self.interface.execute(address_commands(device_address, PollAck()))
             except ProtocolError as error:
                 self.logger.warning(f'POLL_ACK protocol error: {error}', exc_info=error)
 

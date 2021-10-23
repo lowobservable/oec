@@ -1,46 +1,26 @@
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, create_autospec
+
+from coax import ReadAddressCounterHi, ReadAddressCounterLo, LoadAddressCounterHi, LoadAddressCounterLo, Feature
+from coax.protocol import TerminalId
 
 import context
 
-from oec.display import Dimensions, Display, StatusLine, BufferedDisplay, encode_ascii_character, encode_ebcdic_character, encode_string
+from oec.interface import InterfaceWrapper
+from oec.terminal import Terminal
+from oec.display import Display, Dimensions, StatusLine, BufferedDisplay, encode_ascii_character, encode_ebcdic_character, encode_string
+from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+
+from mock_interface import MockInterface
 
 class DisplayClearTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.display = Display(self.terminal, dimensions, None)
+        self.display = _create_display(self.interface)
 
         self.display.write = Mock(wraps=self.display.write)
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
 
     def test_excluding_status_line_with_no_eab_feature(self):
         # Act
@@ -82,23 +62,11 @@ class DisplayClearTestCase(unittest.TestCase):
 
 class DisplayMoveCursorTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.display = Display(self.terminal, dimensions, None)
+        self.display = _create_display(self.interface)
 
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
 
     def test_with_address(self):
         # Act
@@ -138,40 +106,14 @@ class DisplayMoveCursorTestCase(unittest.TestCase):
 
 class DisplayWriteTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.display = Display(self.terminal, dimensions, None)
+        self.display = _create_display(self.interface)
 
         self.display._read_address_counter = Mock(wraps=self.display._read_address_counter)
         self.display._load_address_counter = Mock(wraps=self.display._load_address_counter)
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.display._write_data = Mock(wraps=self.display._write_data)
+        self.display._eab_write_alternate = Mock(wraps=self.display._eab_write_alternate)
 
     def test_no_eab_feature(self):
         # Act and assert
@@ -266,8 +208,10 @@ class DisplayWriteTestCase(unittest.TestCase):
         # Arrange
         self.assertIsNone(self.display.address_counter)
 
-        self.read_address_counter_hi_mock.return_value = 0
-        self.read_address_counter_lo_mock.return_value = 160
+        self.interface.mock_responses = [
+            (None, ReadAddressCounterHi, None, 0),
+            (None, ReadAddressCounterLo, None, 160)
+        ]
 
         # Act
         self.display.write(bytes.fromhex('01 02 03'), None, restore_original_address=True)
@@ -299,7 +243,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.write(bytes.fromhex('01 02 03'), None)
 
         # Assert
-        self.write_data_mock.assert_called_with(self.terminal.interface, bytes.fromhex('01 02 03'), jumbo_write_strategy=None)
+        self.display._write_data.assert_called_with(bytes.fromhex('01 02 03'))
 
     def test_regen_only_repeat(self):
         # Arrange
@@ -309,7 +253,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.write((bytes.fromhex('01 02 03'), 2), None)
 
         # Assert
-        self.write_data_mock.assert_called_with(self.terminal.interface, (bytes.fromhex('01 02 03'), 2), jumbo_write_strategy=None)
+        self.display._write_data.assert_called_with((bytes.fromhex('01 02 03'), 2))
 
     def test_regen_eab(self):
         # Arrange
@@ -320,7 +264,7 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.write(bytes.fromhex('01 02 03'), bytes.fromhex('04 05 06'))
 
         # Assert
-        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, bytes.fromhex('01 04 02 05 03 06'), jumbo_write_strategy=None)
+        self.display._eab_write_alternate.assert_called_with(bytes.fromhex('01 04 02 05 03 06'))
 
     def test_regen_eab_repeat(self):
         # Arrange
@@ -331,25 +275,13 @@ class DisplayWriteTestCase(unittest.TestCase):
         self.display.write((bytes.fromhex('01 02 03'), 2), (bytes.fromhex('04 05 06'), 2))
 
         # Assert
-        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, (bytes.fromhex('01 04 02 05 03 06'), 2), jumbo_write_strategy=None)
+        self.display._eab_write_alternate.assert_called_with((bytes.fromhex('01 04 02 05 03 06'), 2))
 
 class DisplayLoadAddressCounterTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.display = Display(self.terminal, dimensions, None)
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.display = _create_display(self.interface)
 
     def test(self):
         # Act
@@ -358,15 +290,14 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 895)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 3)
-        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 127)
+        self.assert_load_address_counter_hi(3)
+        self.assert_load_address_counter_lo(127)
 
     def test_hi_change(self):
         # Arrange
         self.display._load_address_counter(895, force_load=False)
 
-        self.load_address_counter_hi_mock.reset_mock()
-        self.load_address_counter_lo_mock.reset_mock()
+        self.interface.reset_mock()
 
         # Act
         self.display._load_address_counter(1151, force_load=False)
@@ -374,15 +305,14 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 1151)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 4)
-        self.load_address_counter_lo_mock.assert_not_called()
+        self.assert_load_address_counter_hi(4)
+        self.interface.assert_command_not_executed(None, LoadAddressCounterLo)
 
     def test_lo_change(self):
         # Arrange
         self.display._load_address_counter(895, force_load=False)
 
-        self.load_address_counter_hi_mock.reset_mock()
-        self.load_address_counter_lo_mock.reset_mock()
+        self.interface.reset_mock()
 
         # Act
         self.display._load_address_counter(896, force_load=False)
@@ -390,15 +320,14 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 896)
 
-        self.load_address_counter_hi_mock.assert_not_called()
-        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 128)
+        self.interface.assert_command_not_executed(None, LoadAddressCounterHi)
+        self.assert_load_address_counter_lo(128)
 
     def test_hi_lo_change(self):
         # Arrange
         self.display._load_address_counter(895, force_load=False)
 
-        self.load_address_counter_hi_mock.reset_mock()
-        self.load_address_counter_lo_mock.reset_mock()
+        self.interface.reset_mock()
 
         # Act
         self.display._load_address_counter(1152, force_load=False)
@@ -406,15 +335,14 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 1152)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 4)
-        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 128)
+        self.assert_load_address_counter_hi(4)
+        self.assert_load_address_counter_lo(128)
 
     def test_no_change(self):
         # Arrange
         self.display._load_address_counter(80, force_load=False)
 
-        self.load_address_counter_hi_mock.reset_mock()
-        self.load_address_counter_lo_mock.reset_mock()
+        self.interface.reset_mock()
 
         # Act
         self.display._load_address_counter(80, force_load=False)
@@ -422,15 +350,14 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 80)
 
-        self.load_address_counter_hi_mock.assert_not_called()
-        self.load_address_counter_lo_mock.assert_not_called()
+        self.interface.assert_command_not_executed(None, LoadAddressCounterHi)
+        self.interface.assert_command_not_executed(None, LoadAddressCounterLo)
 
     def test_no_change_force(self):
         # Arrange
         self.display._load_address_counter(80, force_load=False)
 
-        self.load_address_counter_hi_mock.reset_mock()
-        self.load_address_counter_lo_mock.reset_mock()
+        self.interface.reset_mock()
 
         # Act
         self.display._load_address_counter(80, force_load=True)
@@ -438,12 +365,18 @@ class DisplayLoadAddressCounterTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.display.address_counter, 80)
 
-        self.load_address_counter_hi_mock.assert_called_with(self.terminal.interface, 0)
-        self.load_address_counter_lo_mock.assert_called_with(self.terminal.interface, 80)
+        self.assert_load_address_counter_hi(0)
+        self.assert_load_address_counter_lo(80)
+
+    def assert_load_address_counter_hi(self, address):
+        self.interface.assert_command_executed(None, LoadAddressCounterHi, lambda command: command.address == address)
+
+    def assert_load_address_counter_lo(self, address):
+        self.interface.assert_command_executed(None, LoadAddressCounterLo, lambda command: command.address == address)
 
 class StatusLineWriteTestCase(unittest.TestCase):
     def setUp(self):
-        self.display = Mock()
+        self.display = create_autospec(Display, instance=True)
 
         self.display.dimensions = Dimensions(24, 80)
 
@@ -462,7 +395,7 @@ class StatusLineWriteTestCase(unittest.TestCase):
 
 class BufferedDisplayBufferedWriteByteTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.terminal = create_autospec(Terminal, instance=True)
 
         dimensions = Dimensions(24, 80)
 
@@ -561,39 +494,11 @@ class BufferedDisplayBufferedWriteByteTestCase(unittest.TestCase):
 
 class BufferedDisplayFlushTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, None)
+        self.buffered_display = _create_buffered_display(self.interface)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
 
     def test_no_changes(self):
         # Arrange
@@ -624,9 +529,7 @@ class BufferedDisplayFlushTestCase(unittest.TestCase):
 
     def test_single_range_with_eab_feature(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
 
@@ -669,9 +572,7 @@ class BufferedDisplayFlushTestCase(unittest.TestCase):
 
     def test_multiple_ranges_with_eab_feature(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
 
@@ -700,40 +601,12 @@ class BufferedDisplayFlushTestCase(unittest.TestCase):
 
 class BufferedDisplayClearTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, None)
+        self.buffered_display = _create_buffered_display(self.interface)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
 
     def test_excluding_status_line_with_no_eab_feature(self):
         # Arrange
@@ -753,9 +626,7 @@ class BufferedDisplayClearTestCase(unittest.TestCase):
 
     def test_excluding_status_line_with_eab_feature(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
@@ -793,9 +664,7 @@ class BufferedDisplayClearTestCase(unittest.TestCase):
 
     def test_including_status_line_with_eab_feature(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display.write = Mock(wraps=self.buffered_display.write)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
@@ -817,47 +686,23 @@ class BufferedDisplayClearTestCase(unittest.TestCase):
 
 class BufferedDisplayWriteTestCase(unittest.TestCase):
     def setUp(self):
-        self.terminal = Mock()
+        self.interface = MockInterface()
 
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, None)
+        self.buffered_display = _create_buffered_display(self.interface)
 
         self.buffered_display._read_address_counter = Mock(wraps=self.buffered_display._read_address_counter)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
-
-        patcher = patch('oec.display.read_address_counter_hi')
-
-        self.read_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.read_address_counter_lo')
-
-        self.read_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_hi')
-
-        self.load_address_counter_hi_mock = patcher.start()
-
-        patcher = patch('oec.display.load_address_counter_lo')
-
-        self.load_address_counter_lo_mock = patcher.start()
-
-        patcher = patch('oec.display.write_data')
-
-        self.write_data_mock = patcher.start()
-
-        patcher = patch('oec.display.eab_write_alternate')
-
-        self.eab_write_alternate_mock = patcher.start()
-
-        self.addCleanup(patch.stopall)
+        self.buffered_display._write_data = Mock(wraps=self.buffered_display._write_data)
+        self.buffered_display._eab_write_alternate = Mock(wraps=self.buffered_display._eab_write_alternate)
 
     def test_if_current_address_unknown(self):
         # Arrange
         self.assertIsNone(self.buffered_display.address_counter)
 
-        self.read_address_counter_hi_mock.return_value = 0
-        self.read_address_counter_lo_mock.return_value = 160
+        self.interface.mock_responses = [
+            (None, ReadAddressCounterHi, None, 0),
+            (None, ReadAddressCounterLo, None, 160)
+        ]
 
         # Act
         self.buffered_display.write(bytes.fromhex('01 02 03'), None)
@@ -895,7 +740,7 @@ class BufferedDisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.buffered_display.regen_buffer[80:83], bytes.fromhex('01 02 03'))
 
-        self.write_data_mock.assert_called_with(self.terminal.interface, bytes.fromhex('01 02 03'), jumbo_write_strategy=None)
+        self.buffered_display._write_data.assert_called_with(bytes.fromhex('01 02 03'))
 
     def test_regen_only_repeat(self):
         # Arrange
@@ -907,16 +752,16 @@ class BufferedDisplayWriteTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(self.buffered_display.regen_buffer[80:86], bytes.fromhex('01 02 03 01 02 03'))
 
-        self.write_data_mock.assert_called_with(self.terminal.interface, (bytes.fromhex('01 02 03'), 2), jumbo_write_strategy=None)
+        self.buffered_display._write_data.assert_called_with((bytes.fromhex('01 02 03'), 2))
 
     def test_regen_eab(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display._read_address_counter = Mock(wraps=self.buffered_display._read_address_counter)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
+        self.buffered_display._write_data = Mock(wraps=self.buffered_display._write_data)
+        self.buffered_display._eab_write_alternate = Mock(wraps=self.buffered_display._eab_write_alternate)
 
         self.buffered_display.address_counter = 80
 
@@ -927,16 +772,16 @@ class BufferedDisplayWriteTestCase(unittest.TestCase):
         self.assertEqual(self.buffered_display.regen_buffer[80:83], bytes.fromhex('01 02 03'))
         self.assertEqual(self.buffered_display.eab_buffer[80:83], bytes.fromhex('04 05 06'))
 
-        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, bytes.fromhex('01 04 02 05 03 06'), jumbo_write_strategy=None)
+        self.buffered_display._eab_write_alternate.assert_called_with(bytes.fromhex('01 04 02 05 03 06'))
 
     def test_regen_eab_repeat(self):
         # Arrange
-        dimensions = Dimensions(24, 80)
-
-        self.buffered_display = BufferedDisplay(self.terminal, dimensions, 7)
+        self.buffered_display = _create_buffered_display(self.interface, has_eab=True)
 
         self.buffered_display._read_address_counter = Mock(wraps=self.buffered_display._read_address_counter)
         self.buffered_display._load_address_counter = Mock(wraps=self.buffered_display._load_address_counter)
+        self.buffered_display._write_data = Mock(wraps=self.buffered_display._write_data)
+        self.buffered_display._eab_write_alternate = Mock(wraps=self.buffered_display._eab_write_alternate)
 
         self.buffered_display.address_counter = 80
 
@@ -947,7 +792,7 @@ class BufferedDisplayWriteTestCase(unittest.TestCase):
         self.assertEqual(self.buffered_display.regen_buffer[80:86], bytes.fromhex('01 02 03 01 02 03'))
         self.assertEqual(self.buffered_display.eab_buffer[80:86], bytes.fromhex('04 05 06 04 05 06'))
 
-        self.eab_write_alternate_mock.assert_called_with(self.terminal.interface, 7, (bytes.fromhex('01 04 02 05 03 06'), 2), jumbo_write_strategy=None)
+        self.buffered_display._eab_write_alternate.assert_called_with((bytes.fromhex('01 04 02 05 03 06'), 2))
 
     def test_dirty_cleared(self):
         # Arrange
@@ -993,3 +838,29 @@ class EncodeStringTestCase(unittest.TestCase):
 
     def test_unmapped_characters(self):
         self.assertEqual(encode_string('Everything ✓'), bytes.fromhex('a4 95 84 91 98 93 87 88 8d 86 00 18'))
+
+def _create_display(interface):
+    terminal_id = TerminalId(0b11110100)
+    extended_id = 'c1348300'
+    dimensions = Dimensions(24, 80)
+    features = { }
+    keymap = KEYMAP_3278_2
+
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+
+    display = Display(terminal, dimensions, features.get(Feature.EAB))
+
+    return display
+
+def _create_buffered_display(interface, has_eab=False):
+    terminal_id = TerminalId(0b11110100)
+    extended_id = 'c1348300'
+    dimensions = Dimensions(24, 80)
+    features = { Feature.EAB: 7 } if has_eab else { }
+    keymap = KEYMAP_3278_2
+
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+
+    buffered_display = BufferedDisplay(terminal, dimensions, features.get(Feature.EAB))
+
+    return buffered_display
