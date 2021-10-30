@@ -182,7 +182,7 @@ class Display:
         for chunk in chunks[1:]:
             commands.append(Data(chunk))
 
-        self.terminal.execute(WriteData(data))
+        self.terminal.execute(commands)
 
     def _eab_write_alternate(self, data):
         # The EAB_WRITE_ALTERNATE command data must be split so that the two bytes
