@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, create_autospec
+from unittest.mock import Mock, create_autospec, patch
 from coax import Poll, PollAction, TerminalType, Feature, ReadTerminalId, ReadExtendedId, ReadFeatureId
 from coax.protocol import TerminalId
 
@@ -76,7 +76,28 @@ class CreateTerminalTestCase(unittest.TestCase):
 
         self.get_keymap = lambda terminal_id, extended_id: KEYMAP_3278_2
 
-    def test_supported_terminal(self):
+    def test_supported_terminal_with_no_features(self):
+        # Arrange
+        interface = InterfaceWrapper(self.interface)
+
+        self.interface.mock_responses = [
+            (None, ReadTerminalId, None, TerminalId(0b11110100)),
+            (None, ReadExtendedId, None, bytes.fromhex('00 00 00 00'))
+        ]
+
+        # Act
+        terminal = create_terminal(interface, None, None, self.get_keymap)
+
+        # Assert
+        self.assertEqual(terminal.terminal_id.type, TerminalType.CUT)
+        self.assertEqual(terminal.terminal_id.model, 2)
+        self.assertEqual(terminal.terminal_id.keyboard, 15)
+        self.assertEqual(terminal.extended_id, '00000000')
+        self.assertEqual(terminal.display.dimensions, Dimensions(24, 80))
+        self.assertEqual(terminal.features, { })
+        self.assertEqual(terminal.keyboard.keymap.name, '3278-2')
+
+    def test_supported_terminal_with_eab_feature(self):
         # Arrange
         interface = InterfaceWrapper(self.interface)
 
@@ -94,6 +115,28 @@ class CreateTerminalTestCase(unittest.TestCase):
         self.assertEqual(terminal.terminal_id.model, 2)
         self.assertEqual(terminal.terminal_id.keyboard, 15)
         self.assertEqual(terminal.extended_id, 'c1348300')
+        self.assertEqual(terminal.display.dimensions, Dimensions(24, 80))
+        self.assertEqual(terminal.features, { Feature.EAB: 7 })
+        self.assertEqual(terminal.keyboard.keymap.name, '3278-2')
+
+    def test_supported_terminal_features_override(self):
+        # Arrange
+        interface = InterfaceWrapper(self.interface)
+
+        self.interface.mock_responses = [
+            (None, ReadTerminalId, None, TerminalId(0b11110100)),
+            (None, ReadExtendedId, None, bytes.fromhex('00 00 00 00'))
+        ]
+
+        # Act
+        with patch.dict('oec.terminal.os.environ', { 'COAX_FEATURES': 'EAB@7' }):
+            terminal = create_terminal(interface, None, None, self.get_keymap)
+
+        # Assert
+        self.assertEqual(terminal.terminal_id.type, TerminalType.CUT)
+        self.assertEqual(terminal.terminal_id.model, 2)
+        self.assertEqual(terminal.terminal_id.keyboard, 15)
+        self.assertEqual(terminal.extended_id, '00000000')
         self.assertEqual(terminal.display.dimensions, Dimensions(24, 80))
         self.assertEqual(terminal.features, { Feature.EAB: 7 })
         self.assertEqual(terminal.keyboard.keymap.name, '3278-2')

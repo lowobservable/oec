@@ -3,6 +3,7 @@ oec.terminal
 ~~~~~~~~~~~~
 """
 
+import os
 import time
 import logging
 from more_itertools import chunked
@@ -171,7 +172,35 @@ def _get_features(interface, device_address):
 
     ids = interface.execute([address_commands(device_address, command) for command in commands])
 
-    return parse_features(ids, commands)
+    features = parse_features(ids, commands)
+
+    # Add override features - for example, this can be used to add an unreported
+    # EAB feature to a IBM 3179 terminal.
+    if 'COAX_FEATURES' in os.environ:
+        for override in os.environ['COAX_FEATURES'].split(','):
+            if '@' not in override:
+                logger.warning(f'Invalid feature override: {override}')
+                continue
+
+            (name, address) = override.split('@')
+
+            try:
+                feature = Feature[name]
+            except KeyError:
+                logger.warning(f'Invalid feature override: {override}')
+                continue
+
+            try:
+                address = int(address)
+            except ValueError:
+                logger.warning(f'Invalid feature override: {override}')
+                continue
+
+            logger.info(f'Adding override feature {feature} @ {address}')
+
+            features[feature] = address
+
+    return features
 
 def _jumbo_write_split_data(data, max_length, first_chunk_max_length_adjustment=-1):
     if max_length is None:
