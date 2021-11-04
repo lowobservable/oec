@@ -5,6 +5,7 @@ oec.terminal
 
 import time
 import logging
+from more_itertools import chunked
 from coax import read_feature_ids, parse_features, Poll, ReadTerminalId, ReadExtendedId, \
                  LoadControlRegister, TerminalType, Feature, PollAction, Control, \
                  ProtocolError
@@ -88,6 +89,21 @@ class Terminal:
     def execute(self, commands):
         return self.interface.execute(address_commands(self.device_address, commands))
 
+    def execute_jumbo_write(self, data, create_first, create_subsequent, first_chunk_max_length_adjustment=-1):
+        max_length = None
+
+        if self.interface.jumbo_write_strategy == 'split':
+            max_length = self.interface.jumbo_write_max_length
+
+        chunks = _jumbo_write_split_data(data, max_length, first_chunk_max_length_adjustment)
+
+        commands = [create_first(chunks[0])]
+
+        for chunk in chunks[1:]:
+            commands.append(create_subsequent(chunk))
+
+        return self.execute(commands)
+
 class UnsupportedTerminalError(Exception):
     """Unsupported terminal."""
 
@@ -156,3 +172,22 @@ def _get_features(interface, device_address):
     ids = interface.execute([address_commands(device_address, command) for command in commands])
 
     return parse_features(ids, commands)
+
+def _jumbo_write_split_data(data, max_length, first_chunk_max_length_adjustment=-1):
+    if max_length is None:
+        return [data]
+
+    if isinstance(data, tuple):
+        length = len(data[0]) * data[1]
+    else:
+        length = len(data)
+
+    first_chunk_max_length = max_length + first_chunk_max_length_adjustment
+
+    if length <= first_chunk_max_length:
+        return [data]
+
+    if isinstance(data, tuple):
+        data = data[0] * data[1]
+
+    return [data[:first_chunk_max_length], *chunked(data[first_chunk_max_length:], max_length)]

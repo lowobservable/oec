@@ -6,7 +6,7 @@ from coax.protocol import TerminalId
 import context
 
 from oec.interface import InterfaceWrapper
-from oec.terminal import create_terminal, Terminal, UnsupportedTerminalError
+from oec.terminal import create_terminal, Terminal, UnsupportedTerminalError, _jumbo_write_split_data
 from oec.display import Display, Dimensions
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 
@@ -120,6 +120,42 @@ class CreateTerminalTestCase(unittest.TestCase):
         # Act and assert
         with self.assertRaises(UnsupportedTerminalError):
             create_terminal(interface, None, None, self.get_keymap)
+
+class JumboWriteSplitDataTestCase(unittest.TestCase):
+    def test_no_split_strategy(self):
+        for data in [bytes(range(0, 64)), (bytes.fromhex('00'), 64)]:
+            with self.subTest(data=data):
+                result = _jumbo_write_split_data(data, None)
+
+                self.assertEqual(len(result), 1)
+
+                self.assertEqual(result[0], data)
+
+    def test_split_strategy_one_chunk(self):
+        for data in [bytes(range(0, 16)), (bytes.fromhex('00'), 16), bytes(range(0, 31)), (bytes.fromhex('00'), 31)]:
+            with self.subTest(data=data):
+                result = _jumbo_write_split_data(data, 32)
+
+                self.assertEqual(len(result), 1)
+
+                self.assertEqual(result[0], data)
+
+    def test_split_strategy_two_chunks(self):
+        for data in [bytes(range(0, 32)), (bytes.fromhex('00'), 32), bytes(range(0, 63)), (bytes.fromhex('00'), 63)]:
+            with self.subTest(data=data):
+                result = _jumbo_write_split_data(data, 32)
+
+                self.assertEqual(len(result), 2)
+                self.assertEqual(len(result[0]), 31)
+
+    def test_split_strategy_three_chunks(self):
+        for data in [bytes(range(0, 64)), (bytes.fromhex('00'), 64), bytes(range(0, 95)), (bytes.fromhex('00'), 95)]:
+            with self.subTest(data=data):
+                result = _jumbo_write_split_data(data, 32)
+
+                self.assertEqual(len(result), 3)
+                self.assertEqual(len(result[0]), 31)
+                self.assertEqual(len(result[1]), 32)
 
 def _create_terminal(interface):
     terminal_id = TerminalId(0b11110100)

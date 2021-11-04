@@ -175,26 +175,12 @@ class Display:
         return True
 
     def _write_data(self, data):
-        chunks = self.terminal.interface.jumbo_write_split_data(data, -1)
-
-        commands = [WriteData(chunks[0])]
-
-        for chunk in chunks[1:]:
-            commands.append(Data(chunk))
-
-        self.terminal.execute(commands)
+        self.terminal.execute_jumbo_write(data, WriteData, Data, -1)
 
     def _eab_write_alternate(self, data):
         # The EAB_WRITE_ALTERNATE command data must be split so that the two bytes
         # do not get separated, otherwise the write will be incorrect.
-        chunks = self.terminal.interface.jumbo_write_split_data(data, -2)
-
-        commands = [EABWriteAlternate(self.eab_address, chunks[0])]
-
-        for chunk in chunks[1:]:
-            commands.append(Data(chunk))
-
-        self.terminal.execute(commands)
+        self.terminal.execute_jumbo_write(data, lambda chunk: EABWriteAlternate(self.eab_address, chunk), Data, -2)
 
 def _split_address(address):
     if address is None:
