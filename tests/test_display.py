@@ -842,25 +842,23 @@ class EncodeStringTestCase(unittest.TestCase):
 def _create_display(interface):
     terminal_id = TerminalId(0b11110100)
     extended_id = 'c1348300'
-    dimensions = Dimensions(24, 80)
     features = { }
     keymap = KEYMAP_3278_2
 
-    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, features, keymap)
 
-    display = Display(terminal, dimensions, features.get(Feature.EAB))
+    display = Display(terminal, terminal.display.dimensions, features.get(Feature.EAB))
 
     return display
 
 def _create_buffered_display(interface, has_eab=False):
     terminal_id = TerminalId(0b11110100)
     extended_id = 'c1348300'
-    dimensions = Dimensions(24, 80)
     features = { Feature.EAB: 7 } if has_eab else { }
     keymap = KEYMAP_3278_2
 
-    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, features, keymap)
 
-    buffered_display = BufferedDisplay(terminal, dimensions, features.get(Feature.EAB))
+    buffered_display = BufferedDisplay(terminal, terminal.display.dimensions, features.get(Feature.EAB))
 
     return buffered_display

@@ -32,6 +32,9 @@ class InterfaceWrapper:
             _print_i1_jumbo_write_notice(self.jumbo_write_max_length)
 
     def __getattr__(self, attr):
+        if attr == 'identifier':
+            return self.interface.serial.port
+
         return getattr(self.interface, attr)
 
     def execute(self, commands):
@@ -46,12 +49,6 @@ class InterfaceWrapper:
             raise AggregateExecuteError(errors, responses)
 
         return responses
-
-def address_commands(device_address, commands):
-    if isinstance(commands, list):
-        return [(device_address, command) for command in commands]
-
-    return (device_address, commands)
 
 def _get_jumbo_write_strategy():
     value = os.environ.get('COAX_JUMBO')

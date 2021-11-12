@@ -370,11 +370,10 @@ class SessionRenderTestCase(unittest.TestCase):
 def _create_terminal(interface):
     terminal_id = TerminalId(0b11110100)
     extended_id = 'c1348300'
-    dimensions = Dimensions(24, 80)
     features = { }
     keymap = KEYMAP_3278_2
 
-    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, dimensions, features, keymap)
+    terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, features, keymap)
 
     terminal.display.status_line = create_autospec(StatusLine, instance=True)
 

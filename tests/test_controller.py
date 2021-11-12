@@ -4,15 +4,15 @@ from unittest.mock import Mock, create_autospec, patch
 import selectors
 from selectors import BaseSelector
 from logging import Logger
-from coax import Poll, PollAction, PowerOnResetCompletePollResponse, KeystrokePollResponse, PollAck, ReceiveTimeout
+from coax import Poll, PowerOnResetCompletePollResponse, KeystrokePollResponse, PollAck, ReceiveTimeout
 from coax.protocol import TerminalId
 
 import context
 
 from oec.interface import InterfaceWrapper
 from oec.controller import Controller
-from oec.terminal import Terminal, UnsupportedTerminalError
-from oec.display import Dimensions
+from oec.device import UnsupportedDeviceError
+from oec.terminal import Terminal
 from oec.keyboard import KeyboardModifiers, Key
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from oec.session import Session, SessionDisconnectedError
@@ -23,28 +23,30 @@ class RunLoopTestCase(unittest.TestCase):
     def setUp(self):
         self.interface = MockInterface()
 
-        self.session = create_autospec(Session, instance=True)
-        self.create_session = Mock(return_value=self.session)
+        self.terminal = Terminal(self.interface, None, TerminalId(0b11110100), 'c1348300', { }, KEYMAP_3278_2)
 
-        self.controller = Controller(InterfaceWrapper(self.interface), lambda terminal_id, extended_id: KEYMAP_3278_2, self.create_session)
-
-        self.controller.logger = create_autospec(Logger, instance=True)
-
-        self.controller.connected_poll_period = 1
-
-        self.controller.session_selector = create_autospec(BaseSelector, instance=True)
-
-        self.controller._update_session = Mock()
-
-        self.terminal = Terminal(self.interface, None, TerminalId(0b11110100), 'c1348300', Dimensions(24, 80), { }, KEYMAP_3278_2)
-
-        self.terminal.setup = Mock()
+        self.terminal.setup = Mock(Terminal, instance=True)
 
         self.terminal.display.write = Mock()
         self.terminal.display.toggle_cursor_blink = Mock()
         self.terminal.display.toggle_cursor_reverse = Mock()
 
         self.terminal.keyboard.toggle_clicker = Mock()
+
+        self.create_device = Mock(return_value=self.terminal)
+
+        self.session = create_autospec(Session, instance=True)
+        self.create_session = Mock(return_value=self.session)
+
+        self.controller = Controller(InterfaceWrapper(self.interface), self.create_device, self.create_session)
+
+        self.controller.logger = create_autospec(Logger, instance=True)
+
+        self.controller.attached_poll_period = 1
+
+        self.controller.session_selector = create_autospec(BaseSelector, instance=True)
+
+        self.controller._update_session = Mock(wraps=self.controller._update_session)
 
         patcher = patch('oec.controller.time.perf_counter')
 
@@ -54,37 +56,31 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.sleep = patcher.start()
 
-        patcher = patch('oec.controller.create_terminal')
-
-        self.create_terminal = patcher.start()
-
-        self.create_terminal.return_value = self.terminal
-
         self.addCleanup(patch.stopall)
 
-    def test_no_terminal(self):
+    def test_no_device(self):
         self._assert_run_loop(0, ReceiveTimeout, False, 0, False)
         self._assert_run_loop(1, ReceiveTimeout, False, 4, False)
 
-        self.assertIsNone(self.controller.terminal)
+        self.assertIsNone(self.controller.device)
         self.assertIsNone(self.controller.session)
 
-    def test_terminal_attached(self):
+    def test_device_attached(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
         self._assert_run_loop(0, None, False, 0, False)
         self._assert_run_loop(0.5, None, True, 0.5, False)
 
-        self.assertIsNotNone(self.controller.terminal)
+        self.assertIsNotNone(self.controller.device)
         self.assertIsNotNone(self.controller.session)
 
         self.controller._update_session.assert_called()
 
-    def test_unsupported_terminal_attached(self):
-        self.create_terminal.side_effect = [UnsupportedTerminalError]
+    def test_unsupported_device_attached(self):
+        self.create_device.side_effect = [UnsupportedDeviceError]
 
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
 
-        self.assertIsNone(self.controller.terminal)
+        self.assertIsNone(self.controller.device)
         self.assertIsNone(self.controller.session)
 
     def test_keystroke(self):
@@ -93,30 +89,34 @@ class RunLoopTestCase(unittest.TestCase):
         self._assert_run_loop(0, None, False, 0, False)
         self._assert_run_loop(0.5, None, True, 0.5, False)
 
-        self.assertIsNotNone(self.controller.terminal)
+        self.assertIsNotNone(self.controller.device)
         self.assertIsNotNone(self.controller.session)
 
         self.controller.session.handle_key.assert_called_with(Key.LOWER_A, KeyboardModifiers.NONE, 96)
 
-    def test_terminal_detached(self):
+    def test_device_detatched(self):
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
         self._assert_run_loop(0, None, False, 0, False)
         self._assert_run_loop(0.5, ReceiveTimeout, True, 0.5, False)
 
-        self.assertIsNone(self.controller.terminal)
+        self.assertIsNone(self.controller.device)
         self.assertIsNone(self.controller.session)
 
         self.session.terminate.assert_called()
 
     def test_session_disconnected(self):
-        self.controller._update_session.side_effect = [None, SessionDisconnectedError, None]
+        selector_key = Mock(fileobj=self.session)
+
+        self.controller.session_selector.select.return_value = [(selector_key, selectors.EVENT_READ)]
+
+        self.session.handle_host = Mock(side_effect=[None, SessionDisconnectedError])
 
         self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
         self._assert_run_loop(0, None, False, 0, False)
         self._assert_run_loop(0.5, None, True, 0.5, False)
-        self._assert_run_loop(1.5, None, True, 0.5, False)
+        self._assert_run_loop(1.5, None, True, 3, False)
 
-        self.assertIsNotNone(self.controller.terminal)
+        self.assertIsNotNone(self.controller.device)
         self.assertIsNotNone(self.controller.session)
 
         self.assertEqual(self.create_session.call_count, 2)
@@ -174,7 +174,16 @@ class RunLoopTestCase(unittest.TestCase):
 
         self.interface.reset_mock()
 
-        self.perf_counter.side_effect = [poll_time, poll_time + expected_poll_delay]
+        def perf_counter():
+            nonlocal poll_time
+
+            time = poll_time
+
+            poll_time += expected_update_session
+
+            return time
+
+        self.perf_counter.side_effect = perf_counter
 
         self.sleep.reset_mock()
 

@@ -7,6 +7,8 @@ class MockInterface(Interface):
     def __init__(self, responses=[]):
         self.mock_responses = responses
 
+        self.serial = Mock(port='/dev/mock')
+
         self.legacy_firmware_detected = None
         self.legacy_firmware_version = None
 

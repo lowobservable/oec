@@ -5,7 +5,7 @@ from coax import ReadAddressCounterHi, ReadAddressCounterLo, ProtocolError
 
 import context
 
-from oec.interface import InterfaceWrapper, AggregateExecuteError, address_commands
+from oec.interface import InterfaceWrapper, AggregateExecuteError
 
 from mock_interface import MockInterface
 
@@ -105,24 +105,3 @@ class InterfaceWrapperExecuteTestCase(unittest.TestCase):
         self.assertIsInstance(error.errors[0], ProtocolError)
 
         self.assertEqual(len(error.responses), 2)
-
-class AddressCommandsTestCase(unittest.TestCase):
-    def test_single_command(self):
-        # Arrange
-        command = ReadAddressCounterHi()
-
-        # Act
-        result = address_commands(0b111000, command)
-
-        # Assert
-        self.assertEqual(result, (0b111000, command))
-
-    def test_multiple_commands(self):
-        # Arrange
-        commands = [ReadAddressCounterHi(), ReadAddressCounterLo()]
-
-        # Act
-        result = address_commands(0b111000, commands)
-
-        # Assert
-        self.assertEqual(result, [(0b111000, commands[0]), (0b111000, commands[1])])

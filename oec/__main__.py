@@ -2,26 +2,30 @@ import os
 import signal
 import logging
 import argparse
-from coax import open_serial_interface
+from coax import open_serial_interface, TerminalType
 
 from .interface import InterfaceWrapper
 from .controller import Controller
+from .device import get_ids, get_features, UnsupportedDeviceError
+from .terminal import Terminal
 from .tn3270 import TN3270Session
 
 # VT100 emulation is not supported on Windows.
-is_vt100_available = False
+IS_VT100_AVAILABLE = False
 
 if os.name == 'posix':
     from .vt100 import VT100Session
 
-    is_vt100_available = True
+    IS_VT100_AVAILABLE = True
 
 from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from .keymap_3483 import KEYMAP as KEYMAP_3483
 
 logging.basicConfig(level=logging.INFO)
 
-controller = None
+logger = logging.getLogger('oec')
+
+CONTROLLER = None
 
 def _get_keymap(terminal_id, extended_id):
     keymap = KEYMAP_3278_2
@@ -34,35 +38,58 @@ def _get_keymap(terminal_id, extended_id):
 
     return keymap
 
-def _create_session(args, terminal):
-    if args.emulator == 'tn3270':
-        return TN3270Session(terminal, args.host, args.port)
+def _create_device(args, interface, device_address, poll_response):
+    # Read the terminal identifiers.
+    (terminal_id, extended_id) = get_ids(interface, device_address)
 
-    if args.emulator == 'vt100' and is_vt100_available:
+    logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
+
+    if terminal_id.type != TerminalType.CUT:
+        raise UnsupportedDeviceError('Only CUT type terminals are supported')
+
+    # Read the terminal features.
+    features = get_features(interface, device_address)
+
+    logger.info(f'Features = {features}')
+
+    # Get the keymap.
+    keymap = _get_keymap(terminal_id, extended_id)
+
+    logger.info(f'Keymap = {keymap.name}')
+
+    # Create the terminal.
+    terminal = Terminal(interface, device_address, terminal_id, extended_id, features, keymap)
+
+    return terminal
+
+def _create_session(args, device):
+    if args.emulator == 'tn3270':
+        return TN3270Session(device, args.host, args.port)
+
+    if args.emulator == 'vt100' and IS_VT100_AVAILABLE:
         host_command = [args.command, *args.command_args]
 
-        return VT100Session(terminal, host_command)
+        return VT100Session(device, host_command)
 
     raise ValueError('Unsupported emulator')
 
 def _signal_handler(number, frame):
-    global controller
+    global CONTROLLER
 
     print('Stopping controller...')
 
-    if controller:
-        controller.stop()
+    if CONTROLLER:
+        CONTROLLER.stop()
 
-        controller = None
+        CONTROLLER = None
 
 signal.signal(signal.SIGINT, _signal_handler)
 signal.signal(signal.SIGTERM, _signal_handler)
 
 def main():
-    global controller
+    global CONTROLLER
 
-    parser = argparse.ArgumentParser(description=('An open replacement for the IBM 3174 '
-                                                  'Establishment Controller'))
+    parser = argparse.ArgumentParser(description='IBM 3270 terminal controller')
 
     parser.add_argument('serial_port', help='Serial port')
 
@@ -75,7 +102,7 @@ def main():
     tn3270_parser.add_argument('host', help='Hostname')
     tn3270_parser.add_argument('port', nargs='?', default=23, type=int)
 
-    if is_vt100_available:
+    if IS_VT100_AVAILABLE:
         vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
                                              help='VT100 emulator')
 
@@ -85,14 +112,15 @@ def main():
 
     args = parser.parse_args()
 
-    with open_serial_interface(args.serial_port) as interface:
-        create_session = lambda terminal: _create_session(args, terminal)
+    create_device = lambda interface, device_address, poll_response: _create_device(args, interface, device_address, poll_response)
+    create_session = lambda device: _create_session(args, device)
 
-        controller = Controller(InterfaceWrapper(interface), _get_keymap, create_session)
+    with open_serial_interface(args.serial_port) as interface:
+        CONTROLLER = Controller(InterfaceWrapper(interface), create_device, create_session)
 
         print('Starting controller...')
 
-        controller.run()
+        CONTROLLER.run()
 
 if __name__ == '__main__':
     main()
