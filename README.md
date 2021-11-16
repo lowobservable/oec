@@ -32,6 +32,7 @@ Only directly attached CUT (Control Unit Terminal) type terminals are supported.
   * IBM 3278-2
   * IBM 3472
   * IBM 3483-V (InfoWindow II)
+  * [Memorex 2078](http://mrxhist.org/docs/Schu_4971.pdf)
 
 You may have to modify the key mapping to support your specific terminal configuration.
 
