@@ -3,7 +3,7 @@ oec.terminal
 ~~~~~~~~~~~~
 """
 
-from coax import Poll, LoadControlRegister, Feature, PollAction, Control
+from coax import LoadControlRegister, Feature, PollAction, Control
 
 from .device import Device, UnsupportedDeviceError
 from .display import Dimensions, BufferedDisplay
@@ -53,30 +53,26 @@ class Terminal(Device):
         # Show the attached indicator on the status line.
         self.display.status_line.write_string(0, 'OEC')
 
-    def poll(self):
-        """Execute a POLL command with queued actions."""
+        self.display.move_cursor(row=0, column=0)
+
+    def get_poll_action(self):
+        """Get the POLL action."""
         poll_action = PollAction.NONE
 
         # Convert a queued alarm or keyboard clicker change to POLL action.
         if self.alarm:
             poll_action = PollAction.ALARM
+
+            self.alarm = False
         elif self.keyboard.clicker != self.last_poll_keyboard_clicker:
             if self.keyboard.clicker:
                 poll_action = PollAction.ENABLE_KEYBOARD_CLICKER
             else:
                 poll_action = PollAction.DISABLE_KEYBOARD_CLICKER
 
-        poll_response = self.execute(Poll(poll_action))
-
-        # Clear the queued alarm and keyboard clicker change if the POLL was
-        # successful.
-        if poll_action == PollAction.ALARM:
-            self.alarm = False
-        elif poll_action in [PollAction.ENABLE_KEYBOARD_CLICKER,
-                             PollAction.DISABLE_KEYBOARD_CLICKER]:
             self.last_poll_keyboard_clicker = self.keyboard.clicker
 
-        return poll_response
+        return poll_action
 
     def sound_alarm(self):
         """Queue an alarm on next POLL command."""

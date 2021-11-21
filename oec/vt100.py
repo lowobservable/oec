@@ -71,9 +71,10 @@ class VT100Session(Session):
     """VT100 session."""
 
     def __init__(self, terminal, host_command):
+        super().__init__(terminal)
+
         self.logger = logging.getLogger(__name__)
 
-        self.terminal = terminal
         self.host_command = host_command
         self.host_process = None
 
@@ -94,18 +95,10 @@ class VT100Session(Session):
 
         self.vt100_stream = pyte.ByteStream(self.vt100_screen)
 
+        self.is_first_render = True
+
     def start(self):
-        # Start the host process.
         self._start_host_process()
-
-        # Clear the screen.
-        self.terminal.display.clear()
-
-        # Update the status line.
-        self.terminal.display.status_line.write_string(45, 'VT100')
-
-        # Reset the cursor.
-        self.terminal.display.move_cursor(row=0, column=0)
 
     def terminate(self):
         if self.host_process:
@@ -137,6 +130,11 @@ class VT100Session(Session):
         self.host_process.write(bytes_)
 
     def render(self):
+        if self.is_first_render:
+            self.terminal.display.status_line.write_string(45, 'VT100')
+
+            self.is_first_render = False
+
         self._apply()
         self._flush()
 

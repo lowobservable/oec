@@ -23,7 +23,7 @@ from .keymap_3483 import KEYMAP as KEYMAP_3483
 
 logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('oec')
+logger = logging.getLogger('oec.main')
 
 CONTROLLER = None
 
@@ -76,7 +76,7 @@ def _create_session(args, device):
 def _signal_handler(number, frame):
     global CONTROLLER
 
-    print('Stopping controller...')
+    logger.info('Stopping controller...')
 
     if CONTROLLER:
         CONTROLLER.stop()
@@ -115,10 +115,10 @@ def main():
     create_device = lambda interface, device_address, poll_response: _create_device(args, interface, device_address, poll_response)
     create_session = lambda device: _create_session(args, device)
 
+    logger.info('Starting controller...')
+
     with open_serial_interface(args.serial_port) as interface:
         CONTROLLER = Controller(InterfaceWrapper(interface), create_device, create_session)
-
-        print('Starting controller...')
 
         CONTROLLER.run()
 

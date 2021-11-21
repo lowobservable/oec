@@ -1,265 +1,344 @@
 import unittest
-from unittest.mock import Mock, create_autospec, patch
+from unittest.mock import Mock, create_autospec, patch, call, ANY
 
 import selectors
 from selectors import BaseSelector
-from logging import Logger
-from coax import Poll, PowerOnResetCompletePollResponse, KeystrokePollResponse, PollAck, ReceiveTimeout
-from coax.protocol import TerminalId
+from concurrent.futures import Future
+from coax import Poll, PollAck, PowerOnResetCompletePollResponse, KeystrokePollResponse, ReceiveTimeout
 
 import context
 
 from oec.interface import InterfaceWrapper
-from oec.controller import Controller
-from oec.device import UnsupportedDeviceError
+from oec.controller import Controller, SessionState
 from oec.terminal import Terminal
-from oec.keyboard import KeyboardModifiers, Key
-from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from oec.session import Session, SessionDisconnectedError
 
 from mock_interface import MockInterface
 
-class RunLoopTestCase(unittest.TestCase):
+class UpdateSessionsTestCase(unittest.TestCase):
     def setUp(self):
         self.interface = MockInterface()
 
-        self.terminal = Terminal(self.interface, None, TerminalId(0b11110100), 'c1348300', { }, KEYMAP_3278_2)
-
-        self.terminal.setup = Mock(Terminal, instance=True)
-
-        self.terminal.display.write = Mock()
-        self.terminal.display.toggle_cursor_blink = Mock()
-        self.terminal.display.toggle_cursor_reverse = Mock()
-
-        self.terminal.keyboard.toggle_clicker = Mock()
-
-        self.create_device = Mock(return_value=self.terminal)
-
-        self.session = create_autospec(Session, instance=True)
-        self.create_session = Mock(return_value=self.session)
-
-        self.controller = Controller(InterfaceWrapper(self.interface), self.create_device, self.create_session)
-
-        self.controller.logger = create_autospec(Logger, instance=True)
-
-        self.controller.attached_poll_period = 1
+        self.controller = Controller(InterfaceWrapper(self.interface), None, None)
 
         self.controller.session_selector = create_autospec(BaseSelector, instance=True)
-
-        self.controller._update_session = Mock(wraps=self.controller._update_session)
 
         patcher = patch('oec.controller.time.perf_counter')
 
         self.perf_counter = patcher.start()
-
-        patcher = patch('oec.controller.time.sleep')
-
-        self.sleep = patcher.start()
 
         self.addCleanup(patch.stopall)
 
-    def test_no_device(self):
-        self._assert_run_loop(0, ReceiveTimeout, False, 0, False)
-        self._assert_run_loop(1, ReceiveTimeout, False, 4, False)
-
-        self.assertIsNone(self.controller.device)
-        self.assertIsNone(self.controller.session)
-
-    def test_device_attached(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-        self._assert_run_loop(0.5, None, True, 0.5, False)
-
-        self.assertIsNotNone(self.controller.device)
-        self.assertIsNotNone(self.controller.session)
-
-        self.controller._update_session.assert_called()
-
-    def test_unsupported_device_attached(self):
-        self.create_device.side_effect = [UnsupportedDeviceError]
-
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-
-        self.assertIsNone(self.controller.device)
-        self.assertIsNone(self.controller.session)
-
-    def test_keystroke(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0110000010), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-        self._assert_run_loop(0.5, None, True, 0.5, False)
-
-        self.assertIsNotNone(self.controller.device)
-        self.assertIsNotNone(self.controller.session)
-
-        self.controller.session.handle_key.assert_called_with(Key.LOWER_A, KeyboardModifiers.NONE, 96)
-
-    def test_device_detatched(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-        self._assert_run_loop(0.5, ReceiveTimeout, True, 0.5, False)
-
-        self.assertIsNone(self.controller.device)
-        self.assertIsNone(self.controller.session)
-
-        self.session.terminate.assert_called()
-
-    def test_session_disconnected(self):
-        selector_key = Mock(fileobj=self.session)
-
-        self.controller.session_selector.select.return_value = [(selector_key, selectors.EVENT_READ)]
-
-        self.session.handle_host = Mock(side_effect=[None, SessionDisconnectedError])
-
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-        self._assert_run_loop(0.5, None, True, 0.5, False)
-        self._assert_run_loop(1.5, None, True, 3, False)
-
-        self.assertIsNotNone(self.controller.device)
-        self.assertIsNotNone(self.controller.session)
-
-        self.assertEqual(self.create_session.call_count, 2)
-
-    def test_toggle_cursor_blink(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-
-        self.terminal.display.toggle_cursor_blink.assert_called_once()
-
-        self.terminal.display.toggle_cursor_blink.reset_mock()
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-
-        self.terminal.display.toggle_cursor_blink.assert_called_once()
-
-    def test_toggle_cursor_reverse(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-
-        self.terminal.display.toggle_cursor_reverse.assert_called_once()
-
-        self.terminal.display.toggle_cursor_reverse.reset_mock()
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101010010), False, 0, True)
-        self._assert_run_loop(0, KeystrokePollResponse(0b0100111110), False, 0, True)
-
-        self.terminal.display.toggle_cursor_reverse.assert_called_once()
-
-    def test_toggle_clicker(self):
-        self._assert_run_loop(0, PowerOnResetCompletePollResponse(0xa), False, 0, True)
-
-        self._assert_run_loop(0, KeystrokePollResponse(0b0101011110), False, 0, True)
-        self._assert_run_loop(0, None, False, 0, False)
-
-        self.terminal.keyboard.toggle_clicker.assert_called_once()
-
-        self.terminal.keyboard.toggle_clicker.reset_mock()
-
-        self._assert_run_loop(0.5, KeystrokePollResponse(0b0101011110), True, 0.5, True)
-        self._assert_run_loop(1, None, False, 0, False)
-
-        self.terminal.keyboard.toggle_clicker.assert_called_once()
-
-    def _assert_run_loop(self, poll_time, poll_response, expected_update_session, expected_poll_delay, expected_poll_ack):
+    def test_no_sessions(self):
         # Arrange
-        self.controller._update_session.reset_mock()
 
-        self.interface.mock_responses = [(None, Poll, None, poll_response)]
+        self.perf_counter.side_effect = [0, 0.1, 0.2]
 
-        self.interface.reset_mock()
-
-        def perf_counter():
-            nonlocal poll_time
-
-            time = poll_time
-
-            poll_time += expected_update_session
-
-            return time
-
-        self.perf_counter.side_effect = perf_counter
-
-        self.sleep.reset_mock()
+        self.controller.session_selector.select.return_value = []
 
         # Act
-        self.controller._run_loop()
+        self.assertFalse(self.controller._update_sessions(1.0))
+
+    def test_missing_sessions_are_started(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
+
+        self.controller.devices[None] = device
+
+        self.controller._start_session = Mock()
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2]
+
+        self.controller.session_selector.select.return_value = []
+
+        # Act
+        self.controller._update_sessions(1.0)
 
         # Assert
-        if expected_update_session:
-            self.controller._update_session.assert_called_once_with(expected_poll_delay)
-            self.sleep.assert_not_called()
-        else:
-            self.controller._update_session.assert_not_called()
+        self.controller._start_session.assert_called_once_with(device)
 
-            if expected_poll_delay > 0:
-                self.sleep.assert_called_once_with(expected_poll_delay)
-            else:
-                self.sleep.assert_not_called()
+    def test_started_sessions_are_activated(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
 
-        if expected_poll_ack:
-            self.interface.assert_command_executed(None, PollAck)
-        else:
-            self.interface.assert_command_not_executed(None, PollAck)
+        session = create_autospec(Session, instance=True)
 
-class UpdateSessionTestCase(unittest.TestCase):
+        future = create_autospec(Future, instance=True)
+
+        future.done = Mock(return_value=True)
+        future.result = Mock(return_value=session)
+
+        self.controller.devices[None] = device
+        self.controller.sessions[None] = (SessionState.STARTING, future)
+
+        self.controller.session_selector.select.return_value = []
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2]
+
+        # Act
+        self.controller._update_sessions(1.0)
+
+        # Assert
+        self.assertEqual(self.controller.sessions, { None: (SessionState.ACTIVE, session) })
+
+        self.controller.session_selector.register.assert_called_once_with(session, selectors.EVENT_READ)
+
+    def test_terminated_sessions_are_removed(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
+
+        future = create_autospec(Future, instance=True)
+
+        future.done = Mock(return_value=True)
+        future.result = Mock()
+
+        self.controller.devices[None] = device
+        self.controller.sessions[None] = (SessionState.TERMINATING, future)
+
+        self.controller.session_selector.select.return_value = []
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2]
+
+        # Act
+        self.controller._update_sessions(1.0)
+
+        # Assert
+        self.assertEqual(self.controller.sessions, { })
+
+    def test_active_sessions_select_timeout(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
+
+        session = create_autospec(Session, instance=True)
+
+        self.controller.devices[None] = device
+        self.controller.sessions[None] = (SessionState.ACTIVE, session)
+
+        self.controller.session_selector.select.return_value = []
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2]
+
+        # Act
+        self.controller._update_sessions(1.0)
+
+        # Assert
+        self.controller.session_selector.select.assert_called_once_with(0.9)
+
+        session.handle_host.assert_not_called()
+        session.render.assert_not_called()
+
+    def test_active_sessions_select_available(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
+
+        session = create_autospec(Session, instance=True)
+
+        self.controller.devices[None] = device
+        self.controller.sessions[None] = (SessionState.ACTIVE, session)
+
+        selector_key = Mock(fileobj=session)
+
+        self.controller.session_selector.select.side_effect = [[(selector_key, selectors.EVENT_READ)], []]
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2, 0.3, 0.4, 0.4]
+
+        # Act
+        self.controller._update_sessions(1.0)
+
+        # Assert
+        self.controller.session_selector.select.assert_has_calls([call(0.9), call(0.8)])
+
+        session.handle_host.assert_called_once()
+        session.render.assert_called_once()
+
+    def test_active_sessions_disconnected(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True)
+
+        session = create_autospec(Session, instance=True)
+
+        session.handle_host.side_effect = SessionDisconnectedError
+
+        self.controller.devices[None] = device
+        self.controller.sessions[None] = (SessionState.ACTIVE, session)
+
+        self.controller._terminate_session = Mock()
+
+        selector_key = Mock(fileobj=session)
+
+        self.controller.session_selector.select.side_effect = [[(selector_key, selectors.EVENT_READ)], []]
+
+        self.perf_counter.side_effect = [0, 0.1, 0.2, 0.3, 0.4, 0.4]
+
+        # Act
+        self.controller._update_sessions(1.0)
+
+        # Assert
+        self.controller.session_selector.select.assert_has_calls([call(0.9), call(0.8)])
+
+        self.controller._terminate_session.assert_called_once_with(session)
+
+        session.render.assert_not_called()
+
+class PollAttachedDevicesTestCase(unittest.TestCase):
     def setUp(self):
-        self.controller = Controller(None, None, None)
+        self.interface = MockInterface()
 
-        self.controller.session = create_autospec(Session, instance=True)
+        self.controller = Controller(InterfaceWrapper(self.interface), None, None)
 
-        self.controller.session_selector = create_autospec(BaseSelector, instance=True)
+        self.controller._handle_poll_response = Mock(wraps=self.controller._handle_poll_response)
+
+    def test_no_attached_devices(self):
+        self.controller._poll_attached_devices()
+
+        # Assert
+        self.interface.assert_command_not_executed(ANY, Poll)
+        self.controller._handle_poll_response.assert_not_called()
+
+    def test_tt_ar(self):
+        # Arrange
+        device = create_autospec(Terminal, instance=True, device_address=None)
+
+        self.controller.devices[None] = device
+
+        # Act
+        self.controller._poll_attached_devices()
+
+        # Assert
+        self.interface.assert_command_executed(None, Poll)
+        self.interface.assert_command_not_executed(None, PollAck)
+        self.controller._handle_poll_response.assert_not_called()
+
+    def test_receive_timeout(self):
+        # Arrange
+        self.interface.mock_responses = [(None, Poll, None, ReceiveTimeout)]
+
+        device = create_autospec(Terminal, instance=True, device_address=None)
+
+        self.controller.devices[None] = device
+
+        self.controller._handle_device_lost = Mock()
+
+        # Act
+        self.controller._poll_attached_devices()
+
+        # Assert
+        self.controller._handle_device_lost.assert_called_once_with(device)
+
+        self.interface.assert_command_executed(None, Poll)
+        self.interface.assert_command_not_executed(None, PollAck)
+        self.controller._handle_poll_response.assert_not_called()
+
+    def test_keystroke(self):
+        # Arrange
+        poll_response = KeystrokePollResponse(0b0110000010)
+
+        poll = Mock(side_effect=[poll_response, None, None])
+
+        self.interface.mock_responses = [(None, Poll, None, poll)]
+
+        device = create_autospec(Terminal, instance=True, device_address=None)
+
+        self.controller.devices[None] = device
+
+        self.controller._handle_keystroke_poll_response = Mock()
+
+        # Act
+        self.controller._poll_attached_devices()
+
+        # Assert
+        self.controller._handle_keystroke_poll_response.assert_called_once_with(device, poll_response)
+
+        self.assertEqual(poll.call_count, 2)
+        self.interface.assert_command_executed(None, PollAck)
+
+class PollNextDetatchedDeviceTestCase(unittest.TestCase):
+    def setUp(self):
+        self.interface = MockInterface()
+
+        self.interface.mock_responses = [(None, Poll, None, ReceiveTimeout)]
+
+        self.controller = Controller(InterfaceWrapper(self.interface), None, None)
 
         patcher = patch('oec.controller.time.perf_counter')
 
         self.perf_counter = patcher.start()
 
-    def test_zero_duration(self):
-        # Act
-        self.controller._update_session(0)
+        self.addCleanup(patch.stopall)
 
-        # Assert
-        self.controller.session.handle_host.assert_not_called()
-        self.controller.session.render.assert_not_called()
-
-        self.controller.session_selector.select.assert_not_called()
-
-    def test_select_timeout(self):
+    def test_poll_period_not_expired(self):
         # Arrange
-        self.controller.session_selector.select.return_value = []
+        self.controller.detatched_poll_period = 0.5
+        self.controller.last_detatched_poll_time = 1.0
+
+        self.perf_counter.return_value = 1.1
 
         # Act
-        self.controller._update_session(1)
+        self.controller._poll_next_detatched_device()
 
         # Assert
-        self.controller.session.handle_host.assert_not_called()
-        self.controller.session.render.assert_not_called()
+        self.interface.assert_command_not_executed(None, Poll)
 
-        self.controller.session_selector.select.assert_called_once()
+        self.assertEqual(self.controller.last_detatched_poll_time, 1.0)
 
-    def test_select_available(self):
+    def test_empty_queue_that_remains_empty(self):
         # Arrange
-        self.perf_counter.side_effect = [0, 0.75, 0.75]
-
-        selector_key = Mock(fileobj=self.controller.session)
-
-        self.controller.session_selector.select.side_effect = [[(selector_key, selectors.EVENT_READ)], []]
+        self.controller._get_detatched_device_addresses = Mock(return_value=[])
 
         # Act
-        self.controller._update_session(1)
+        self.controller._poll_next_detatched_device()
 
         # Assert
-        self.controller.session.handle_host.assert_called_once()
-        self.controller.session.render.assert_called_once()
+        self.interface.assert_command_not_executed(None, Poll)
 
-        self.assertEqual(self.controller.session_selector.select.call_count, 2)
+        self.controller._get_detatched_device_addresses.assert_called_once()
 
-        call_args_list = self.controller.session_selector.select.call_args_list
+    def test_empty_queue_that_is_populated(self):
+        # Arrange
+        self.controller._get_detatched_device_addresses = Mock(return_value=[None])
 
-        self.assertEqual(call_args_list[0][0][0], 1)
-        self.assertEqual(call_args_list[1][0][0], 0.25)
+        # Act
+        self.controller._poll_next_detatched_device()
+
+        # Assert
+        self.interface.assert_command_executed(None, Poll)
+
+        self.controller._get_detatched_device_addresses.assert_called_once()
+
+    def test_non_empty_queue(self):
+        # Arrange
+        self.interface.mock_responses = [(0b000000, Poll, None, ReceiveTimeout)]
+
+        self.controller.detatched_device_poll_queue = [0b000000, 0b100000]
+
+        self.controller._get_detatched_device_addresses = Mock()
+
+        # Act
+        self.controller._poll_next_detatched_device()
+
+        # Assert
+        self.interface.assert_command_executed(0b000000, Poll)
+
+        self.assertEqual(self.controller.detatched_device_poll_queue, [0b100000])
+
+        self.controller._get_detatched_device_addresses.assert_not_called()
+
+    def test_device_found(self):
+        # Arrange
+        self.controller.detatched_device_poll_queue = [None]
+
+        poll_response = PowerOnResetCompletePollResponse(0xa)
+
+        poll = Mock(side_effect=[poll_response, None, None])
+
+        self.interface.mock_responses = [(None, Poll, None, poll)]
+
+        self.controller._handle_device_found = Mock()
+
+        # Act
+        self.controller._poll_next_detatched_device()
+
+        # Assert
+        self.controller._handle_device_found.assert_called_once_with(None, poll_response)
+
+        self.interface.assert_command_executed(None, PollAck)

@@ -131,6 +131,8 @@ class SessionRenderTestCase(unittest.TestCase):
 
     def test_with_no_eab_feature(self):
         # Arrange
+        self.session.is_first_render = False
+
         self.session.host_process.read = Mock(return_value=b'abc')
 
         self.session.handle_host()
@@ -156,6 +158,8 @@ class SessionRenderTestCase(unittest.TestCase):
         self.terminal.display.buffered_write_byte = Mock(wraps=self.terminal.display.buffered_write_byte)
         self.terminal.display.move_cursor = Mock(wraps=self.terminal.display.move_cursor)
         self.terminal.display.flush = Mock(wraps=self.terminal.display.flush)
+
+        self.session.is_first_render = False
 
         self.session.host_process.read = Mock(return_value=b'abc')
 

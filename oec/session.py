@@ -1,4 +1,7 @@
 class Session:
+    def __init__(self, terminal):
+        self.terminal = terminal
+
     def start(self):
         raise NotImplementedError
 

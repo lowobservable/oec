@@ -38,11 +38,13 @@ class FormatAddressTestCase(unittest.TestCase):
         self.interface = MockInterface()
 
     def test_no_port(self):
-        self.assertEqual(format_address(InterfaceWrapper(self.interface), None), '/dev/mock')
+        self.assertEqual(format_address(InterfaceWrapper(self.interface), None), '/dev/mock#0')
 
-    def test_multiplexer(self):
-        with self.assertRaises(NotImplementedError):
-            format_address(InterfaceWrapper(self.interface), 0b110000)
+    def test_known_multiplexer_port(self):
+        self.assertEqual(format_address(InterfaceWrapper(self.interface), 0b110000), '/dev/mock#3')
+
+    def test_unknown_multiplexer_port(self):
+        self.assertEqual(format_address(InterfaceWrapper(self.interface), 0b111111), '/dev/mock?111111')
 
 class GetIdsTestCase(unittest.TestCase):
     def setUp(self):

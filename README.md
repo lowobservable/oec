@@ -22,12 +22,15 @@ emulation.
       - [x] Basic TN3270E
       - [ ] SSL/TLS
   - [x] VT100
-  - [ ] Connection Menu
+  - [ ] Connection menu
   - [ ] MLT (Multiple Logical Terminals)
+  - [x] Up to 8 terminals connected via IBM 3299 multiplexer<sup>1</sup>
+
+<sup>1</sup> - requires [interface2](https://github.com/lowobservable/coax/tree/master/interface2#readme) with recent firmware
 
 ## Supported Terminals
 
-Only directly attached CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
+Only CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
 
   * IBM 3278-2
   * IBM 3472

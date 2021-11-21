@@ -9,6 +9,7 @@ import logging
 from more_itertools import chunked
 from coax import read_feature_ids, parse_features, ReadTerminalId, ReadExtendedId, \
                  Feature, ProtocolError
+from coax.multiplexer import PORT_MAP_3299
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +24,8 @@ class Device:
         """Setup the device."""
         raise NotImplementedError
 
-    def poll(self):
-        """POLL the device."""
+    def get_poll_action(self):
+        """Get the POLL action."""
         raise NotImplementedError
 
     def execute(self, commands):
@@ -67,9 +68,12 @@ def address_commands(device_address, commands):
 def format_address(interface, device_address):
     """Format a device address."""
     if device_address is None:
-        return interface.identifier
+        return f'{interface.identifier}#0'
 
-    raise NotImplementedError
+    try:
+        return f'{interface.identifier}#{PORT_MAP_3299.index(device_address)}'
+    except ValueError:
+        return f'{interface.identifier}?{device_address:06b}'
 
 def get_ids(interface, device_address, extended_id_retry_attempts=3):
     terminal_id = None
@@ -78,7 +82,7 @@ def get_ids(interface, device_address, extended_id_retry_attempts=3):
     try:
         terminal_id = interface.execute(address_commands(device_address, ReadTerminalId()))
     except ProtocolError as error:
-        logger.warning(f'READ_TERMINAL_ID protocol error: {error}', exc_info=error)
+        logger.warning(f'READ_TERMINAL_ID protocol error: {error}')
 
     # Retry the READ_EXTENDED_ID command as it appears to fail frequently on the
     # first request - unlike the READ_TERMINAL_ID command,
@@ -90,9 +94,9 @@ def get_ids(interface, device_address, extended_id_retry_attempts=3):
 
             break
         except ProtocolError as error:
-            logger.warning(f'READ_EXTENDED_ID protocol error: {error}', exc_info=error)
+            logger.warning(f'READ_EXTENDED_ID protocol error: {error}')
 
-        time.sleep(0.25)
+        time.sleep(0.1)
 
     return (terminal_id, extended_id.hex() if extended_id is not None else None)
 

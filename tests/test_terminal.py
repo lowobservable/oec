@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import create_autospec
-from coax import Poll, PollAction
+from coax import PollAction
 from coax.protocol import TerminalId
 
 import context
@@ -43,7 +43,7 @@ class TerminalSetupTestCase(unittest.TestCase):
     def test(self):
         self.terminal.setup()
 
-class TerminalPollTestCase(unittest.TestCase):
+class TerminalGetPollActionTestCase(unittest.TestCase):
     def setUp(self):
         self.interface = MockInterface()
 
@@ -54,26 +54,17 @@ class TerminalPollTestCase(unittest.TestCase):
         # The terminal will be initialized in a state where the terminal keyboard clicker
         # state is unknown, and this cannot be read. Therefore the first POLL will always
         # attempt to set the keyboard clicker state...
-        self.terminal.poll()
-
-        self.interface.reset_mock()
+        self.terminal.get_poll_action()
 
     def test_with_no_queued_actions(self):
-        # Act
-        self.terminal.poll()
-
-        # Assert
-        self.assert_poll_with_poll_action(PollAction.NONE)
+        self.assertEqual(self.terminal.get_poll_action(), PollAction.NONE)
 
     def test_with_sound_alarm_queued(self):
         # Arrange
         self.terminal.sound_alarm()
 
-        # Act
-        self.terminal.poll()
-
-        # Assert
-        self.assert_poll_with_poll_action(PollAction.ALARM)
+        # Act and assert
+        self.assertEqual(self.terminal.get_poll_action(), PollAction.ALARM)
 
     def test_with_enable_keyboard_clicker_queued(self):
         # Arrange
@@ -81,14 +72,8 @@ class TerminalPollTestCase(unittest.TestCase):
 
         self.terminal.keyboard.toggle_clicker()
 
-        # Act
-        self.terminal.poll()
-
-        # Assert
-        self.assert_poll_with_poll_action(PollAction.ENABLE_KEYBOARD_CLICKER)
-
-    def assert_poll_with_poll_action(self, action):
-        self.interface.assert_command_executed(None, Poll, lambda command: command.action == action)
+        # Act and assert
+        self.assertEqual(self.terminal.get_poll_action(), PollAction.ENABLE_KEYBOARD_CLICKER)
 
 def _create_terminal(interface):
     terminal_id = TerminalId(0b11110100)

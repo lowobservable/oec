@@ -1,10 +1,12 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, ANY
 
 from coax import ProtocolError, ReceiveError, ReceiveTimeout
 from coax.interface import Interface
 
 class MockInterface(Interface):
     def __init__(self, responses=[]):
+        super().__init__()
+
         self.mock_responses = responses
 
         self.serial = Mock(port='/dev/mock')
@@ -40,7 +42,7 @@ class MockInterface(Interface):
             for command in call[0][0]:
                 (call_device_address, call_command) = command
 
-                if call_device_address == device_address and isinstance(call_command, command_type):
+                if (device_address == ANY or call_device_address == device_address) and isinstance(call_command, command_type):
                     if predicate is None or predicate(call_command):
                         commands.append(command)
 

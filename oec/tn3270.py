@@ -48,9 +48,10 @@ class TN3270Session(Session):
     """TN3270 session."""
 
     def __init__(self, terminal, host, port):
+        super().__init__(terminal)
+
         self.logger = logging.getLogger(__name__)
 
-        self.terminal = terminal
         self.host = host
         self.port = port
 

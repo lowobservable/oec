@@ -7,6 +7,8 @@ import os
 import logging
 from textwrap import dedent
 
+from coax import ReceiveTimeout
+
 logger = logging.getLogger(__name__)
 
 class AggregateExecuteError(Exception):
@@ -20,7 +22,7 @@ class InterfaceWrapper:
     def __init__(self, interface):
         self.interface = interface
 
-        self.timeout = 0.1
+        self.timeout = 0.001
 
         self.jumbo_write_strategy = _get_jumbo_write_strategy()
         self.jumbo_write_max_length = None
@@ -37,13 +39,13 @@ class InterfaceWrapper:
 
         return getattr(self.interface, attr)
 
-    def execute(self, commands):
+    def execute(self, commands, receive_timeout_is_error=True):
         if not isinstance(commands, list):
             return self.interface.execute(commands, self.timeout)
 
         responses = self.interface.execute(commands, self.timeout)
 
-        errors = [response for response in responses if isinstance(response, BaseException)]
+        errors = [response for response in responses if isinstance(response, BaseException) and (receive_timeout_is_error or not isinstance(response, ReceiveTimeout))]
 
         if any(errors):
             raise AggregateExecuteError(errors, responses)
