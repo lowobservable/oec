@@ -146,6 +146,13 @@ class Controller:
         while duration > 0:
             start_time = time.perf_counter()
 
+            # The Windows selector will raise an error if there are no handles registered while
+            # other selectors may block for the provided duration. We'll skip if there are no
+            # handles registered, this can change between loop iterations if a session is
+            # disconnected.
+            if not self.session_selector.get_map():
+                break
+
             selected = self.session_selector.select(duration)
 
             if not selected:
