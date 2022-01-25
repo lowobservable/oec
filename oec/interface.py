@@ -11,9 +11,14 @@ from coax import ReceiveTimeout
 
 logger = logging.getLogger(__name__)
 
-class AggregateExecuteError(Exception):
+class ExecuteError(Exception):
     def __init__(self, errors, responses):
-        super().__init__('One or more errors occurred')
+        if len(errors) == 1:
+            message = str(errors[0])
+        else:
+            message = f'{len(errors)} occurred'
+
+        super().__init__(message)
 
         self.errors = errors
         self.responses = responses
@@ -44,13 +49,15 @@ class InterfaceWrapper:
             return self.interface.execute(commands, self.timeout)
 
         responses = self.interface.execute(commands, self.timeout)
-
-        errors = [response for response in responses if isinstance(response, BaseException) and (receive_timeout_is_error or not isinstance(response, ReceiveTimeout))]
+        errors = get_errors(responses, receive_timeout_is_error)
 
         if any(errors):
-            raise AggregateExecuteError(errors, responses)
+            raise ExecuteError(errors, responses)
 
         return responses
+
+def get_errors(responses, receive_timeout_is_error):
+    return [response for response in responses if isinstance(response, BaseException) and (receive_timeout_is_error or not isinstance(response, ReceiveTimeout))]
 
 def _get_jumbo_write_strategy():
     value = os.environ.get('COAX_JUMBO')

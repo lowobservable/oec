@@ -5,7 +5,7 @@ from coax import ReadAddressCounterHi, ReadAddressCounterLo, ProtocolError
 
 import context
 
-from oec.interface import InterfaceWrapper, AggregateExecuteError
+from oec.interface import InterfaceWrapper, ExecuteError
 
 from mock_interface import MockInterface
 
@@ -96,7 +96,7 @@ class InterfaceWrapperExecuteTestCase(unittest.TestCase):
         ]
 
         # Act and assert
-        with self.assertRaises(AggregateExecuteError) as context:
+        with self.assertRaises(ExecuteError) as context:
             self.interface_wrapper.execute([(None, ReadAddressCounterHi()), (None, ReadAddressCounterLo())])
 
         error = context.exception
