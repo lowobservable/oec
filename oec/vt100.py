@@ -9,8 +9,8 @@ from ptyprocess import PtyProcess
 import pyte
 
 from .session import Session, SessionDisconnectedError
-from .display import encode_ascii_character
-from .keyboard import Key, get_ascii_character_for_key, MODIFIER_KEYS
+from .display import encode_character
+from .keyboard import Key, get_character_for_key, MODIFIER_KEYS
 
 VT100_KEY_MAP = {
     Key.NOT: b'^',
@@ -157,7 +157,7 @@ class VT100Session(Session):
             if bytes_ is not None:
                 return bytes_
 
-            character = get_ascii_character_for_key(key)
+            character = get_character_for_key(key)
 
             if character and character.isprintable():
                 return character.encode()
@@ -193,7 +193,7 @@ class VT100Session(Session):
                 character = row_buffer[column]
 
                 # TODO: Investigate multi-byte or zero-byte cases further.
-                regen_byte = encode_ascii_character(ord(character.data)) if len(character.data) == 1 else 0x00
+                regen_byte = encode_character(character.data) if len(character.data) == 1 else 0x00
                 eab_byte = 0x00 if has_eab else None
 
                 self.terminal.display.buffered_write_byte(regen_byte, eab_byte, row=row, column=column)

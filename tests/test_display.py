@@ -8,7 +8,7 @@ import context
 
 from oec.interface import InterfaceWrapper
 from oec.terminal import Terminal
-from oec.display import Display, Dimensions, StatusLine, BufferedDisplay, encode_ascii_character, encode_ebcdic_character, encode_string
+from oec.display import Display, Dimensions, StatusLine, BufferedDisplay, encode_character, encode_string
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 
 from mock_interface import MockInterface
@@ -812,32 +812,22 @@ class BufferedDisplayWriteTestCase(unittest.TestCase):
 
         self.assertSequenceEqual(self.buffered_display.dirty, [80])
 
-class EncodeAsciiCharacterTestCase(unittest.TestCase):
+class EncodeCharacterTestCase(unittest.TestCase):
     def test_mapped_character(self):
-        self.assertEqual(encode_ascii_character(ord('a')), 0x80)
+        self.assertEqual(encode_character('a'), 0x80)
 
     def test_unmapped_character(self):
-        self.assertEqual(encode_ascii_character(ord('`')), 0x00)
+        self.assertEqual(encode_character('`'), 0x00)
 
     def test_out_of_range(self):
-        self.assertEqual(encode_ascii_character(ord('✓')), 0x00)
-
-class EncodeEbcdicCharacterTestCase(unittest.TestCase):
-    def test_mapped_character(self):
-        self.assertEqual(encode_ebcdic_character(129), 0x80)
-
-    def test_unmapped_character(self):
-        self.assertEqual(encode_ebcdic_character(185), 0x00)
-
-    def test_out_of_range(self):
-        self.assertEqual(encode_ebcdic_character(256), 0x00)
+        self.assertEqual(encode_character('✓'), 0x00)
 
 class EncodeStringTestCase(unittest.TestCase):
     def test_mapped_characters(self):
         self.assertEqual(encode_string('Hello, world!'), bytes.fromhex('a7 84 8b 8b 8e 33 00 96 8e 91 8b 83 19'))
 
     def test_unmapped_characters(self):
-        self.assertEqual(encode_string('Everything ✓'), bytes.fromhex('a4 95 84 91 98 93 87 88 8d 86 00 18'))
+        self.assertEqual(encode_string('Everything ✓'), bytes.fromhex('a4 95 84 91 98 93 87 88 8d 86 00 00'))
 
 def _create_display(interface):
     terminal_id = TerminalId(0b11110100)

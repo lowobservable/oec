@@ -365,8 +365,8 @@ class Keyboard:
 
         return (False, None)
 
-def get_ascii_character_for_key(key):
-    """Map a key to ASCII character."""
+def get_character_for_key(key):
+    """Map a key to a character."""
     if not key:
         return None
 
@@ -376,12 +376,3 @@ def get_ascii_character_for_key(key):
         return None
 
     return chr(value)
-
-def get_ebcdic_character_for_key(key):
-    """Map a key to EBCDIC character."""
-    ascii_character = get_ascii_character_for_key(key)
-
-    if not ascii_character:
-        return None
-
-    return ascii_character.encode('cp500')[0]

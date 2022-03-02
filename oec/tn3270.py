@@ -9,8 +9,8 @@ from tn3270 import Telnet, Emulator, AttributeCell, CharacterCell, AID, Color, H
 from tn3270.ebcdic import DUP, FM
 
 from .session import Session, SessionDisconnectedError
-from .display import encode_ascii_character, encode_ebcdic_character, encode_string
-from .keyboard import Key, get_ebcdic_character_for_key
+from .display import encode_character, encode_string
+from .keyboard import Key, get_character_for_key
 
 AID_KEY_MAP = {
     Key.CLEAR: AID.CLEAR,
@@ -47,13 +47,14 @@ AID_KEY_MAP = {
 class TN3270Session(Session):
     """TN3270 session."""
 
-    def __init__(self, terminal, host, port):
+    def __init__(self, terminal, host, port, character_encoding):
         super().__init__(terminal)
 
         self.logger = logging.getLogger(__name__)
 
         self.host = host
         self.port = port
+        self.character_encoding = character_encoding
 
         self.telnet = None
         self.emulator = None
@@ -144,9 +145,11 @@ class TN3270Session(Session):
             elif key == Key.FIELD_MARK:
                 self.emulator.field_mark()
             else:
-                byte = get_ebcdic_character_for_key(key)
+                character = get_character_for_key(key)
 
-                if byte:
+                if character:
+                    byte = character.encode(self.character_encoding)[0]
+
                     self.emulator.input(byte, self.keyboard_insert)
         except OperatorError as error:
             self.operator_error = error
@@ -193,7 +196,7 @@ class TN3270Session(Session):
         for address in self.emulator.dirty:
             cell = self.emulator.cells[address]
 
-            (regen_byte, eab_byte) = _map_cell(cell, has_eab)
+            (regen_byte, eab_byte) = _map_cell(cell, self.character_encoding, has_eab)
 
             self.terminal.display.buffered_write_byte(regen_byte, eab_byte, index=address)
 
@@ -234,7 +237,7 @@ class TN3270Session(Session):
 
         return message_area.ljust(9, b'\x00')
 
-def _map_cell(cell, has_eab):
+def _map_cell(cell, character_encoding, has_eab):
     regen_byte = 0x00
 
     if isinstance(cell, AttributeCell):
@@ -245,13 +248,15 @@ def _map_cell(cell, has_eab):
 
         if cell.character_set is not None:
             # TODO: Temporary workaround until character set support is added.
-            regen_byte = encode_ascii_character(ord('ß'))
+            regen_byte = encode_character('ß')
         elif byte == DUP:
-            regen_byte = encode_ascii_character(ord('*'))
+            regen_byte = encode_character('*')
         elif byte == FM:
-            regen_byte = encode_ascii_character(ord(';'))
+            regen_byte = encode_character(';')
         else:
-            regen_byte = encode_ebcdic_character(byte)
+            character = bytes([byte]).decode(character_encoding)
+
+            regen_byte = encode_character(character)
 
     if not has_eab:
         return (regen_byte, None)

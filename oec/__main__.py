@@ -1,5 +1,6 @@
 import os
 import signal
+import codecs
 import logging
 import argparse
 from coax import open_serial_interface, TerminalType
@@ -38,6 +39,14 @@ def _get_keymap(terminal_id, extended_id):
 
     return keymap
 
+def _get_character_encoding(encoding):
+    try:
+        codecs.lookup(encoding)
+    except LookupError:
+        raise argparse.ArgumentTypeError(f'invalid encoding: {encoding}')
+
+    return encoding
+
 def _create_device(args, interface, device_address, poll_response):
     # Read the terminal identifiers.
     (terminal_id, extended_id) = get_ids(interface, device_address)
@@ -64,7 +73,7 @@ def _create_device(args, interface, device_address, poll_response):
 
 def _create_session(args, device):
     if args.emulator == 'tn3270':
-        return TN3270Session(device, args.host, args.port)
+        return TN3270Session(device, args.host, args.port, args.character_encoding)
 
     if args.emulator == 'vt100' and IS_VT100_AVAILABLE:
         host_command = [args.command, *args.command_args]
@@ -101,6 +110,9 @@ def main():
 
     tn3270_parser.add_argument('host', help='Hostname')
     tn3270_parser.add_argument('port', nargs='?', default=23, type=int)
+
+    tn3270_parser.add_argument('--codepage', metavar='encoding', default='ibm037',
+                               dest='character_encoding', type=_get_character_encoding)
 
     if IS_VT100_AVAILABLE:
         vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',

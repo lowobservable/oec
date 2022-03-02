@@ -317,7 +317,7 @@ class BufferedDisplay(Display):
         # TODO: Implement multiple ranges with optimization.
         return [(self.dirty[0], self.dirty[-1])]
 
-_ASCII_CHAR_MAP = {
+CHAR_MAP = {
     '>': 0x08,
     '<': 0x09,
     '[': 0x0a,
@@ -447,27 +447,10 @@ _ASCII_CHAR_MAP = {
     '*': 0xbf
 }
 
-_EBCDIC_CHAR_MAP = {ascii_character.encode('cp500')[0]: byte for ascii_character, byte in _ASCII_CHAR_MAP.items()}
+def encode_character(character):
+    """Map a character to a terminal display character."""
+    return CHAR_MAP.get(character, 0x00)
 
-ASCII_CHAR_MAP = [_ASCII_CHAR_MAP.get(character, 0x00) for character in map(chr, range(256))]
-
-EBCDIC_CHAR_MAP = [_EBCDIC_CHAR_MAP.get(character, 0x00) for character in range(256)]
-
-def encode_ascii_character(character):
-    """Map an ASCII character to a terminal display character."""
-    if character > 255:
-        return 0x00
-
-    return ASCII_CHAR_MAP[character]
-
-def encode_ebcdic_character(character):
-    """Map an EBCDIC character to a terminal display character."""
-    if character > 255:
-        return 0x00
-
-    return EBCDIC_CHAR_MAP[character]
-
-def encode_string(string, errors='replace'):
+def encode_string(string):
     """Map a string to terminal display characters."""
-    return bytes([encode_ascii_character(character) for character
-                  in string.encode('ascii', errors)])
+    return bytes(map(encode_character, string))

@@ -24,7 +24,7 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.terminal = _create_terminal(self.interface)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23)
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
 
         self.telnet = create_autospec(Telnet, instance=True)
 
@@ -71,7 +71,7 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
         self.terminal = _create_terminal(self.interface)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23)
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
 
         self.session.emulator = create_autospec(Emulator, instance=True)
 
@@ -226,7 +226,7 @@ class SessionRenderTestCase(unittest.TestCase):
         self.terminal.display.flush = Mock(wraps=self.terminal.display.flush)
         self.terminal.display.status_line.write = Mock(wraps=self.terminal.display.status_line.write)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23)
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
 
         self.session.telnet = create_autospec(Telnet, instance=True)
         self.session.emulator = create_autospec(Emulator, instance=True)
@@ -238,20 +238,20 @@ class SessionRenderTestCase(unittest.TestCase):
         cells = _create_screen_cells(24, 80)
 
         _set_attribute(cells, 0, protected=True)
-        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
+        _set_characters(cells, 1, 'PROTECTED'.encode('ibm037'))
         _set_attribute(cells, 10, protected=True, intensified=True)
-        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
+        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('ibm037'))
         _set_attribute(cells, 32, protected=True, hidden=True)
-        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
+        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('ibm037'))
         _set_attribute(cells, 49, protected=False)
-        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
+        _set_characters(cells, 50, 'UNPROTECTED'.encode('ibm037'))
         _set_attribute(cells, 61, protected=False, intensified=True)
-        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
+        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('ibm037'))
         _set_attribute(cells, 85, protected=False, hidden=True)
-        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
+        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('ibm037'))
         _set_attribute(cells, 104, protected=True)
         _set_formatting(cells, 104, color=Color.YELLOW)
-        _set_characters(cells, 105, 'EAB'.encode('cp500'))
+        _set_characters(cells, 105, 'EAB'.encode('ibm037'))
         _set_formatting(cells, 105, blink=True)
         _set_formatting(cells, 106, reverse=True)
         _set_formatting(cells, 107, underscore=True)
@@ -287,20 +287,20 @@ class SessionRenderTestCase(unittest.TestCase):
         cells = _create_screen_cells(24, 80)
 
         _set_attribute(cells, 0, protected=True)
-        _set_characters(cells, 1, 'PROTECTED'.encode('cp500'))
+        _set_characters(cells, 1, 'PROTECTED'.encode('ibm037'))
         _set_attribute(cells, 10, protected=True, intensified=True)
-        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('cp500'))
+        _set_characters(cells, 11, 'PROTECTED INTENSIFIED'.encode('ibm037'))
         _set_attribute(cells, 32, protected=True, hidden=True)
-        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('cp500'))
+        _set_characters(cells, 33, 'PROTECTED HIDDEN'.encode('ibm037'))
         _set_attribute(cells, 49, protected=False)
-        _set_characters(cells, 50, 'UNPROTECTED'.encode('cp500'))
+        _set_characters(cells, 50, 'UNPROTECTED'.encode('ibm037'))
         _set_attribute(cells, 61, protected=False, intensified=True)
-        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('cp500'))
+        _set_characters(cells, 62, 'UNPROTECTED INTENSIFIED'.encode('ibm037'))
         _set_attribute(cells, 85, protected=False, hidden=True)
-        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('cp500'))
+        _set_characters(cells, 86, 'UNPROTECTED HIDDEN'.encode('ibm037'))
         _set_attribute(cells, 104, protected=True)
         _set_formatting(cells, 104, color=Color.YELLOW)
-        _set_characters(cells, 105, 'EAB'.encode('cp500'))
+        _set_characters(cells, 105, 'EAB'.encode('ibm037'))
         _set_formatting(cells, 105, blink=True)
         _set_formatting(cells, 106, reverse=True)
         _set_formatting(cells, 107, underscore=True)

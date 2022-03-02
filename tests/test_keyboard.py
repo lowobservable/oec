@@ -2,7 +2,7 @@ import unittest
 
 import context
 
-from oec.keyboard import KeyboardModifiers, Key, Keymap, Keyboard, get_ascii_character_for_key, get_ebcdic_character_for_key
+from oec.keyboard import KeyboardModifiers, Key, Keymap, Keyboard, get_character_for_key
 from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from oec.keymap_3483 import KEYMAP as KEYMAP_3483
 
@@ -200,22 +200,12 @@ class KeyboardGetKeyMultipleModifierReleaseTestCase(unittest.TestCase):
     def _assert_get_key(self, scan_code, key, modifiers, modifiers_changed):
         self.assertEqual(self.keyboard.get_key(scan_code), (key, modifiers, modifiers_changed))
 
-class GetAsciiCharacterForKeyTestCase(unittest.TestCase):
+class GetCharacterForKeyTestCase(unittest.TestCase):
     def test_none(self):
-        self.assertIsNone(get_ascii_character_for_key(None))
+        self.assertIsNone(get_character_for_key(None))
 
     def test_no_mapping(self):
-        self.assertIsNone(get_ascii_character_for_key(Key.ATTN))
+        self.assertIsNone(get_character_for_key(Key.ATTN))
 
     def test_mapping(self):
-        self.assertEqual(get_ascii_character_for_key(Key.UPPER_A), 'A')
-
-class GetEbcdicCharacterForKeyTestCase(unittest.TestCase):
-    def test_none(self):
-        self.assertIsNone(get_ebcdic_character_for_key(None))
-
-    def test_no_mapping(self):
-        self.assertIsNone(get_ebcdic_character_for_key(Key.ATTN))
-
-    def test_mapping(self):
-        self.assertEqual(get_ebcdic_character_for_key(Key.UPPER_A), 193)
+        self.assertEqual(get_character_for_key(Key.UPPER_A), 'A')
