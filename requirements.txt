@@ -3,7 +3,7 @@ ptyprocess==0.7.0
 pycoax==0.11.1
 pyserial==3.5
 pyte==0.8.0
-pytn3270==0.12.0
+pytn3270==0.13.0
 sliplib==0.6.2
 sortedcontainers==2.4.0
 wcwidth==0.2.5

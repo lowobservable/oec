@@ -85,13 +85,6 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         # Assert
         self.session.emulator.aid.assert_called_with(AID.ENTER)
 
-    def test_backspace(self):
-        # Act
-        self.session.handle_key(Key.BACKSPACE, KeyboardModifiers.NONE, None)
-
-        # Assert
-        self.session.emulator.backspace.assert_called()
-
     def test_tab(self):
         # Act
         self.session.handle_key(Key.TAB, KeyboardModifiers.NONE, None)
@@ -162,12 +155,33 @@ class SessionHandleKeyTestCase(unittest.TestCase):
         # Assert
         self.session.emulator.cursor_right.assert_called_with(rate=2)
 
+    def test_backspace(self):
+        # Act
+        self.session.handle_key(Key.BACKSPACE, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.backspace.assert_called()
+
     def test_delete(self):
         # Act
         self.session.handle_key(Key.DELETE, KeyboardModifiers.NONE, None)
 
         # Assert
         self.session.emulator.delete.assert_called()
+
+    def test_erase_eof(self):
+        # Act
+        self.session.handle_key(Key.ERASE_EOF, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.erase_end_of_field.assert_called()
+
+    def test_erase_input(self):
+        # Act
+        self.session.handle_key(Key.ERASE_INPUT, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.session.emulator.erase_input.assert_called()
 
     def test_dup(self):
         # Act

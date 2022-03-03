@@ -114,8 +114,6 @@ class TN3270Session(Session):
 
                 self.waiting_on_host = True
             #elif key == Key.RESET:
-            elif key == Key.BACKSPACE:
-                self.emulator.backspace()
             elif key == Key.TAB:
                 self.emulator.tab()
             elif key == Key.BACKTAB:
@@ -136,10 +134,16 @@ class TN3270Session(Session):
                 self.emulator.cursor_right()
             elif key == Key.RIGHT_2:
                 self.emulator.cursor_right(rate=2)
-            elif key == Key.INSERT:
-                self._handle_insert_key()
+            elif key == Key.BACKSPACE:
+                self.emulator.backspace()
             elif key == Key.DELETE:
                 self.emulator.delete()
+            elif key == Key.ERASE_EOF:
+                self.emulator.erase_end_of_field()
+            elif key == Key.ERASE_INPUT:
+                self.emulator.erase_input()
+            elif key == Key.INSERT:
+                self._handle_insert_key()
             elif key == Key.DUP:
                 self.emulator.dup()
             elif key == Key.FIELD_MARK:
