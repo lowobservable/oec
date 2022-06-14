@@ -21,6 +21,7 @@ if os.name == 'posix':
 
 from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
 from .keymap_3483 import KEYMAP as KEYMAP_3483
+from .keymap_3483_102 import KEYMAP as KEYMAP_3483_102
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +34,9 @@ def _get_keymap(terminal_id, extended_id):
 
     if extended_id == 'c1348300':
         keymap = KEYMAP_3483
+
+    if extended_id == 'c1348301':
+        keymap = KEYMAP_3483_102
 
     if extended_id == 'c1347200':
         keymap = KEYMAP_3483
