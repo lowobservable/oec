@@ -110,6 +110,8 @@ class TN3270Session(Session):
 
         try:
             if aid is not None:
+                self._reset_insert()
+
                 self.emulator.aid(aid)
 
                 self.waiting_on_host = True
@@ -161,6 +163,14 @@ class TN3270Session(Session):
     def render(self):
         self._apply()
         self._flush()
+
+    def _reset_insert(self):
+        if not self.keyboard_insert:
+            return
+
+        self.keyboard_insert = False
+
+        self.terminal.display.status_line.write_keyboard_insert(False)
 
     def _handle_insert_key(self):
         self.keyboard_insert = not self.keyboard_insert

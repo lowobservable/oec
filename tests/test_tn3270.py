@@ -217,6 +217,17 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
         self.session.emulator.input.assert_called_with(0x81, True)
 
+    def test_insert_reset_after_aid(self):
+        # Act
+        self.session.handle_key(Key.INSERT, KeyboardModifiers.NONE, None)
+
+        self.session.handle_key(Key.LOWER_A, KeyboardModifiers.NONE, None)
+
+        self.session.handle_key(Key.ENTER, KeyboardModifiers.NONE, None)
+
+        # Assert
+        self.assertFalse(self.session.keyboard_insert)
+
     def test_operator_error(self):
         # Arrange
         self.session.emulator.input = Mock(side_effect=ProtectedCellOperatorError)
