@@ -3,12 +3,11 @@ oec.device
 ~~~~~~~~~~
 """
 
-import os
 import time
 import logging
 from more_itertools import chunked
 from coax import read_feature_ids, parse_features, ReadTerminalId, ReadExtendedId, \
-                 Feature, ProtocolError
+                 ProtocolError
 from coax.multiplexer import PORT_MAP_3299
 
 logger = logging.getLogger(__name__)
@@ -103,37 +102,9 @@ def get_ids(interface, device_address, extended_id_retry_attempts=3):
 def get_features(interface, device_address):
     commands = read_feature_ids()
 
-    ids = interface.execute([address_commands(device_address, command) for command in commands])
+    ids = interface.execute(address_commands(device_address, commands))
 
-    features = parse_features(ids, commands)
-
-    # Add override features - for example, this can be used to add an unreported
-    # EAB feature to a IBM 3179 terminal.
-    if 'COAX_FEATURES' in os.environ:
-        for override in os.environ['COAX_FEATURES'].split(','):
-            if '@' not in override:
-                logger.warning(f'Invalid feature override: {override}')
-                continue
-
-            (name, address) = override.split('@')
-
-            try:
-                feature = Feature[name]
-            except KeyError:
-                logger.warning(f'Invalid feature override: {override}')
-                continue
-
-            try:
-                address = int(address)
-            except ValueError:
-                logger.warning(f'Invalid feature override: {override}')
-                continue
-
-            logger.info(f'Adding override feature {feature} @ {address}')
-
-            features[feature] = address
-
-    return features
+    return parse_features(ids, commands)
 
 def _jumbo_write_split_data(data, max_length, first_chunk_max_length_adjustment=-1):
     if max_length is None:

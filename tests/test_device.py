@@ -146,14 +146,6 @@ class GetFeaturesTestCase(unittest.TestCase):
         # Assert
         self.assertEqual(features, { Feature.EAB: 7 })
 
-    def test_override(self):
-        # Act
-        with patch.dict('oec.device.os.environ', { 'COAX_FEATURES': 'EAB@7' }):
-            features = get_features(InterfaceWrapper(self.interface), None)
-
-        # Assert
-        self.assertEqual(features, { Feature.EAB: 7 })
-
 class JumboWriteSplitDataTestCase(unittest.TestCase):
     def test_no_split_strategy(self):
         for data in [bytes(range(0, 64)), (bytes.fromhex('00'), 64)]:
