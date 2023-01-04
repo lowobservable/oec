@@ -73,7 +73,7 @@ class UpdateSessionsTestCase(unittest.TestCase):
 
         self.controller.session_selector.select.return_value = []
 
-        self.perf_counter.side_effect = [0, 0.1, 0.2]
+        self.perf_counter.side_effect = [0, 0.1, 0.2, 0.3, 0.4]
 
         # Act
         self.controller._update_sessions(1.0)
@@ -82,6 +82,9 @@ class UpdateSessionsTestCase(unittest.TestCase):
         self.assertEqual(self.controller.sessions, { None: (SessionState.ACTIVE, session) })
 
         self.controller.session_selector.register.assert_called_once_with(session, selectors.EVENT_READ)
+
+        session.handle_host.assert_called_once()
+        session.render.assert_called_once()
 
     def test_terminated_sessions_are_removed(self):
         # Arrange

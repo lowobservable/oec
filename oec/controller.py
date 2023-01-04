@@ -120,6 +120,8 @@ class Controller:
         sessions = { state: [(device_address, session) for (device_address, (_, session)) in group] for (state, group) in groupby(self.sessions.items(), lambda item: item[1][0]) }
 
         # Handle started sessions.
+        started_sessions = []
+
         for (device_address, future) in sessions.get(SessionState.STARTING, []):
             if future.done():
                 session = future.result()
@@ -127,6 +129,8 @@ class Controller:
                 self.sessions[device_address] = (SessionState.ACTIVE, session)
 
                 self.session_selector.register(session, selectors.EVENT_READ)
+
+                started_sessions.append(session)
 
                 self.logger.info(f'Session started for device @ {format_address(self.interface, device_address)}')
 
@@ -143,24 +147,27 @@ class Controller:
         # Update active sessions.
         updated_sessions = set()
 
+        is_first_iteration = True
+
         while duration > 0:
             start_time = time.perf_counter()
 
-            # The Windows selector will raise an error if there are no handles registered while
-            # other selectors may block for the provided duration. We'll skip if there are no
-            # handles registered, this can change between loop iterations if a session is
-            # disconnected.
-            if not self.session_selector.get_map():
+            sessions = set(self._select_sessions(duration))
+
+            # Handle host output from started sessions immediately as the telnet client
+            # buffer may contain commands that were buffered during negotiation. If we do
+            # not handle them here, we will have to wait for further commands to trigger
+            # the read select event.
+            #
+            # This ensures that messages such as "connection rejected, no available device"
+            # are shown on the terminal.
+            if is_first_iteration:
+                sessions.update(started_sessions)
+
+            if not sessions:
                 break
 
-            selected = self.session_selector.select(duration)
-
-            if not selected:
-                break
-
-            for (key, _) in selected:
-                session = key.fileobj
-
+            for session in sessions:
                 try:
                     if session.handle_host():
                         updated_sessions.add(session)
@@ -170,9 +177,20 @@ class Controller:
                     self._handle_session_disconnected(session)
 
             duration -= (time.perf_counter() - start_time)
+            is_first_iteration = False
 
         for session in updated_sessions:
             session.render()
+
+    def _select_sessions(self, duration):
+        # The Windows selector will raise an error if there are no handles registered while
+        # other selectors may block for the provided duration.
+        if not self.session_selector.get_map():
+            return []
+
+        selected = self.session_selector.select(duration)
+
+        return [key.fileobj for (key, _) in selected]
 
     def _start_session(self, device):
         device_address = device.device_address
