@@ -7,8 +7,11 @@ import time
 import logging
 from more_itertools import chunked
 from coax import read_feature_ids, parse_features, ReadTerminalId, ReadExtendedId, \
-                 ProtocolError
+                 TerminalType, LoadAddressCounterLo, LoadSecondaryControl, \
+                 SecondaryControl, ProtocolError
 from coax.multiplexer import PORT_MAP_3299
+
+from .interface import ExecuteError
 
 logger = logging.getLogger(__name__)
 
@@ -76,26 +79,28 @@ def format_address(interface, device_address):
 
 def get_ids(interface, device_address, extended_id_retry_attempts=3):
     terminal_id = None
-    extended_id = None
 
     try:
         terminal_id = interface.execute(address_commands(device_address, ReadTerminalId()))
     except ProtocolError as error:
-        logger.warning(f'READ_TERMINAL_ID protocol error: {error}')
+        logger.warning(f'READ_TERMINAL_ID error: {error}')
 
-    # Retry the READ_EXTENDED_ID command as it appears to fail frequently on the
-    # first request - unlike the READ_TERMINAL_ID command,
     extended_id = None
 
-    for attempt in range(extended_id_retry_attempts):
+    if terminal_id is not None and terminal_id.type != TerminalType.DFT:
+        # The READ_EXTENDED_ID command behaves similarly to the READ_MULTIPLE command and
+        # will terminate when the two low order bits of the address counter are zero. In
+        # order to read the entire 4 bytes of the extended ID reliably, we need to set
+        # the secondary control register to disable "big read" and set the address counter
+        # accordingly.
+        #
+        # The address counter will be reset later during device setup.
+        commands = [LoadSecondaryControl(SecondaryControl(big=False)), LoadAddressCounterLo(0), ReadExtendedId()]
+
         try:
-            extended_id = interface.execute(address_commands(device_address, ReadExtendedId()))
-
-            break
-        except ProtocolError as error:
-            logger.warning(f'READ_EXTENDED_ID protocol error: {error}')
-
-        time.sleep(0.1)
+            extended_id = interface.execute(address_commands(device_address, commands))[-1]
+        except ExecuteError as error:
+            logger.warning(f'READ_EXTENDED_ID error: {error}')
 
     return (terminal_id, extended_id.hex() if extended_id is not None else None)
 

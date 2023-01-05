@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from logging import Logger
-from coax import TerminalType, Feature, ReadAddressCounterHi, ReadAddressCounterLo, ReadTerminalId, ReadExtendedId, ReadFeatureId, ProtocolError
+from coax import TerminalType, Feature, ReadAddressCounterHi, ReadAddressCounterLo, ReadTerminalId, ReadExtendedId, ReadFeatureId, ProtocolError, LoadAddressCounterLo, LoadSecondaryControl
 from coax.protocol import TerminalId
 
 import context
@@ -60,6 +60,19 @@ class GetIdsTestCase(unittest.TestCase):
 
         self.addCleanup(patch.stopall)
 
+    def test_dft(self):
+        # Arrange
+        self.interface.mock_responses = [(None, ReadTerminalId, None, TerminalId(0b00000001))]
+
+        # Act
+        (terminal_id, extended_id) = get_ids(InterfaceWrapper(self.interface), None)
+
+        # Assert
+        self.assertEqual(terminal_id.type, TerminalType.DFT)
+        self.assertIsNone(extended_id)
+
+        self.interface.assert_command_not_executed(None, ReadExtendedId)
+
     def test_no_extended_id(self):
         # Arrange
         self.interface.mock_responses = [(None, ReadTerminalId, None, TerminalId(0b11110100))]
@@ -72,6 +85,8 @@ class GetIdsTestCase(unittest.TestCase):
         self.assertEqual(terminal_id.model, 2)
         self.assertEqual(terminal_id.keyboard, 15)
         self.assertIsNone(extended_id)
+
+        self.interface.assert_command_executed(None, ReadExtendedId)
 
     def test_extended_id(self):
         # Arrange
@@ -89,25 +104,25 @@ class GetIdsTestCase(unittest.TestCase):
         self.assertEqual(terminal_id.keyboard, 15)
         self.assertEqual(extended_id, '01020304')
 
-    def test_extended_id_second_attempt(self):
+        self.interface.assert_command_executed(None, LoadSecondaryControl, lambda command: command.control.big == False)
+        self.interface.assert_command_executed(None, LoadAddressCounterLo, lambda command: command.address == 0)
+
+    def test_terminal_id_error(self):
         # Arrange
         self.interface.mock_responses = [
-            (None, ReadTerminalId, None, TerminalId(0b11110100)),
-            (None, ReadExtendedId, None, Mock(side_effect=[ProtocolError, bytes.fromhex('01 02 03 04')]))
+            (None, ReadTerminalId, None, Mock(side_effect=ProtocolError))
         ]
 
         # Act
         (terminal_id, extended_id) = get_ids(InterfaceWrapper(self.interface), None)
 
         # Assert
-        self.assertEqual(terminal_id.type, TerminalType.CUT)
-        self.assertEqual(terminal_id.model, 2)
-        self.assertEqual(terminal_id.keyboard, 15)
-        self.assertEqual(extended_id, '01020304')
+        self.assertIsNone(terminal_id)
+        self.assertIsNone(extended_id)
 
         self.logger.warning.assert_called()
 
-    def test_extended_id_failed(self):
+    def test_extended_id_error(self):
         # Arrange
         self.interface.mock_responses = [
             (None, ReadTerminalId, None, TerminalId(0b11110100)),
