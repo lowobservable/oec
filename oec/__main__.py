@@ -77,7 +77,7 @@ def _create_device(args, interface, device_address, poll_response):
 
 def _create_session(args, device):
     if args.emulator == 'tn3270':
-        return TN3270Session(device, args.host, args.port, args.character_encoding)
+        return TN3270Session(device, args.host, args.port, args.device_names, args.character_encoding)
 
     if args.emulator == 'vt100' and IS_VT100_AVAILABLE:
         host_command = [args.command, *args.command_args]
@@ -89,7 +89,6 @@ def _create_session(args, device):
 def parse_tn3270_host_args(args, parser):
     elements = args.host.rsplit(':', 1)
 
-    host = elements[0]
     port = None
 
     if len(elements) > 1:
@@ -106,7 +105,18 @@ def parse_tn3270_host_args(args, parser):
         else:
             logger.warning('The port argument is deprecated and will be removed in the future, port from host:port is being used.')
 
-    return (host, port if port is not None else 23)
+    if port is None:
+        port = 23
+
+    elements = elements[0].split('@', 1)
+
+    host = elements[-1]
+    device_names = None
+
+    if len(elements) > 1:
+        device_names = elements[0].split(',')
+
+    return (host, port, device_names)
 
 def _signal_handler(number, frame):
     global CONTROLLER
@@ -134,8 +144,8 @@ def main():
     tn3270_parser = subparsers.add_parser('tn3270', description='TN3270 emulator',
                                           help='TN3270 emulator')
 
-    tn3270_parser.add_argument('host', metavar='host[:port]',
-                               help='host and optional port')
+    tn3270_parser.add_argument('host', metavar='[lu[,lu...]@]host[:port]',
+                               help='host and optional port and LUs')
     tn3270_parser.add_argument('port', nargs='?', type=int, help=argparse.SUPPRESS)
 
     tn3270_parser.add_argument('--codepage', metavar='encoding', default='ibm037',
@@ -152,7 +162,7 @@ def main():
     args = parser.parse_args()
 
     if args.emulator == 'tn3270':
-        (args.host, args.port) = parse_tn3270_host_args(args, parser)
+        (args.host, args.port, args.device_names) = parse_tn3270_host_args(args, parser)
 
     create_device = lambda interface, device_address, poll_response: _create_device(args, interface, device_address, poll_response)
     create_session = lambda device: _create_session(args, device)

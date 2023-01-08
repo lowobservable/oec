@@ -20,6 +20,7 @@ emulation.
   - [x] TN3270
       - [x] Extended Data Stream
       - [x] Basic TN3270E
+      - [x] Device name (_LU_) negotiation
       - [ ] SSL/TLS
   - [x] VT100
   - [ ] Connection menu

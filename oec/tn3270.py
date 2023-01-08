@@ -47,13 +47,14 @@ AID_KEY_MAP = {
 class TN3270Session(Session):
     """TN3270 session."""
 
-    def __init__(self, terminal, host, port, character_encoding):
+    def __init__(self, terminal, host, port, device_names, character_encoding):
         super().__init__(terminal)
 
         self.logger = logging.getLogger(__name__)
 
         self.host = host
         self.port = port
+        self.device_names = device_names
         self.character_encoding = character_encoding
 
         self.telnet = None
@@ -192,7 +193,7 @@ class TN3270Session(Session):
 
         self.telnet = Telnet(terminal_type)
 
-        self.telnet.open(self.host, self.port)
+        self.telnet.open(self.host, self.port, self.device_names)
 
         if self.telnet.is_tn3270e_negotiated:
             self.logger.info(f'TN3270E mode negotiated: Device Type = {self.telnet.device_type}, Device Name = {self.telnet.device_name}')

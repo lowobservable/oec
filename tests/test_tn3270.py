@@ -24,7 +24,7 @@ class SessionHandleHostTestCase(unittest.TestCase):
 
         self.terminal = _create_terminal(self.interface)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, None, 'ibm037')
 
         self.telnet = create_autospec(Telnet, instance=True)
 
@@ -71,7 +71,7 @@ class SessionHandleKeyTestCase(unittest.TestCase):
 
         self.terminal = _create_terminal(self.interface)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, None, 'ibm037')
 
         self.session.emulator = create_autospec(Emulator, instance=True)
 
@@ -251,7 +251,7 @@ class SessionRenderTestCase(unittest.TestCase):
         self.terminal.display.flush = Mock(wraps=self.terminal.display.flush)
         self.terminal.display.status_line.write = Mock(wraps=self.terminal.display.status_line.write)
 
-        self.session = TN3270Session(self.terminal, 'mainframe', 23, 'ibm037')
+        self.session = TN3270Session(self.terminal, 'mainframe', 23, None, 'ibm037')
 
         self.session.telnet = create_autospec(Telnet, instance=True)
         self.session.emulator = create_autospec(Emulator, instance=True)
