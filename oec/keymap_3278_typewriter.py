@@ -1,6 +1,6 @@
 """
-oec.keymap_3278_2
-~~~~~~~~~~~~~~~~~
+oec.keymap_3278_typewriter
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
 from .keyboard import Key, Keymap
@@ -198,4 +198,4 @@ MODIFIER_RELEASE_MAP = {
     207: Key.RIGHT_ALT
 }
 
-KEYMAP = Keymap('3278-2', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, MODIFIER_RELEASE_MAP)
+KEYMAP = Keymap('3278 Typewriter', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, MODIFIER_RELEASE_MAP)

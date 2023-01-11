@@ -11,7 +11,7 @@ from oec.interface import InterfaceWrapper
 from oec.terminal import Terminal
 from oec.display import Dimensions, BufferedDisplay
 from oec.keyboard import Key, KeyboardModifiers
-from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from oec.keymap_3278_typewriter import KEYMAP
 from oec.session import SessionDisconnectedError
 from oec.vt100 import VT100Session
 
@@ -183,7 +183,7 @@ def _create_terminal(interface):
     terminal_id = TerminalId(0b11110100)
     extended_id = 'c1348300'
     features = { }
-    keymap = KEYMAP_3278_2
+    keymap = KEYMAP
 
     terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, features, keymap)
 

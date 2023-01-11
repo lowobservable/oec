@@ -1,12 +1,9 @@
 """
-oec.keymap_3483
-~~~~~~~~~~~~~~~
+oec.keymap_ibm_typewriter
+~~~~~~~~~~~~~~~~~~~~~~~~~
 """
 
 from .keyboard import Key, Keymap
-
-# I have a 5250 keyboard for my 3483-V, this mapping is based on photographs
-# of the 3270 keyboard and may not be correct.
 
 KEYMAP_DEFAULT = {
     # Function Keys
@@ -235,4 +232,4 @@ KEYMAP_ALT = {
     106: Key.RIGHT_2
 }
 
-KEYMAP = Keymap('3483', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, modifier_release=240)
+KEYMAP = Keymap('IBM Typewriter', KEYMAP_DEFAULT, KEYMAP_SHIFT, KEYMAP_ALT, modifier_release=240)

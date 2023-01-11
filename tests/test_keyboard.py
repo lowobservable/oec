@@ -3,8 +3,8 @@ import unittest
 import context
 
 from oec.keyboard import KeyboardModifiers, Key, Keymap, Keyboard, get_character_for_key
-from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
-from oec.keymap_3483 import KEYMAP as KEYMAP_3483
+from oec.keymap_3278_typewriter import KEYMAP as KEYMAP_3278_TYPEWRITER
+from oec.keymap_ibm_typewriter import KEYMAP as KEYMAP_IBM_TYPEWRITER
 
 class KeyboardModifiersTestCase(unittest.TestCase):
     def test_is_shift(self):
@@ -39,7 +39,7 @@ class KeyboardModifiersTestCase(unittest.TestCase):
 
 class KeyboardGetKeySingleModifierReleaseTestCase(unittest.TestCase):
     def setUp(self):
-        self.keyboard = Keyboard(KEYMAP_3483)
+        self.keyboard = Keyboard(KEYMAP_IBM_TYPEWRITER)
 
     def test_single_modifier_release_is_true(self):
         self.assertTrue(self.keyboard.single_modifier_release)
@@ -120,13 +120,13 @@ class KeyboardGetKeySingleModifierReleaseTestCase(unittest.TestCase):
         self._assert_get_key(240, None, KeyboardModifiers.NONE, False)
         self._assert_get_key(20, None, KeyboardModifiers.NONE, False)
         self._assert_get_key(36, Key.LOWER_E, KeyboardModifiers.NONE, False)
-    
+
     def _assert_get_key(self, scan_code, key, modifiers, modifiers_changed):
         self.assertEqual(self.keyboard.get_key(scan_code), (key, modifiers, modifiers_changed))
 
 class KeyboardGetKeyMultipleModifierReleaseTestCase(unittest.TestCase):
     def setUp(self):
-        self.keyboard = Keyboard(KEYMAP_3278_2)
+        self.keyboard = Keyboard(KEYMAP_3278_TYPEWRITER)
 
     def test_single_modifier_release_is_false(self):
         self.assertFalse(self.keyboard.single_modifier_release)
@@ -196,7 +196,7 @@ class KeyboardGetKeyMultipleModifierReleaseTestCase(unittest.TestCase):
         self._assert_get_key(76, Key.CAPS_LOCK, KeyboardModifiers.NONE, True)
         self._assert_get_key(204, None, KeyboardModifiers.NONE, False)
         self._assert_get_key(100, Key.LOWER_E, KeyboardModifiers.NONE, False)
-    
+
     def _assert_get_key(self, scan_code, key, modifiers, modifiers_changed):
         self.assertEqual(self.keyboard.get_key(scan_code), (key, modifiers, modifiers_changed))
 

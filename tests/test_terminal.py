@@ -9,7 +9,7 @@ from oec.interface import InterfaceWrapper
 from oec.device import UnsupportedDeviceError
 from oec.terminal import Terminal
 from oec.display import Display, StatusLine
-from oec.keymap_3278_2 import KEYMAP as KEYMAP_3278_2
+from oec.keymap_3278_typewriter import KEYMAP
 
 from mock_interface import MockInterface
 
@@ -19,7 +19,7 @@ class InitTerminalTestCase(unittest.TestCase):
         terminal_id = TerminalId(0b11110100)
 
         # Act
-        Terminal(None, None, terminal_id, None, { }, KEYMAP_3278_2)
+        Terminal(None, None, terminal_id, None, { }, KEYMAP)
 
     def test_unsupported_terminal_model(self):
         # Arrange
@@ -29,7 +29,7 @@ class InitTerminalTestCase(unittest.TestCase):
 
         # Act and assert
         with self.assertRaises(UnsupportedDeviceError):
-            Terminal(None, None, terminal_id, None, { }, KEYMAP_3278_2)
+            Terminal(None, None, terminal_id, None, { }, KEYMAP)
 
 class TerminalSetupTestCase(unittest.TestCase):
     def setUp(self):
@@ -79,7 +79,7 @@ def _create_terminal(interface):
     terminal_id = TerminalId(0b11110100)
     extended_id = 'c1348300'
     features = { }
-    keymap = KEYMAP_3278_2
+    keymap = KEYMAP
 
     terminal = Terminal(InterfaceWrapper(interface), None, terminal_id, extended_id, features, keymap)
 

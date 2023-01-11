@@ -7,7 +7,7 @@ from coax import open_serial_interface, TerminalType
 
 from .interface import InterfaceWrapper
 from .controller import Controller
-from .device import get_ids, get_features, UnsupportedDeviceError
+from .device import get_ids, get_features, get_keyboard_description, UnsupportedDeviceError
 from .terminal import Terminal
 from .tn3270 import TN3270Session
 
@@ -19,9 +19,9 @@ if os.name == 'posix':
 
     IS_VT100_AVAILABLE = True
 
-from .keymap_3278_2 import KEYMAP as KEYMAP_3278_2
-from .keymap_3483 import KEYMAP as KEYMAP_3483
-from .keymap_3483_102 import KEYMAP as KEYMAP_3483_102
+from .keymap_3278_typewriter import KEYMAP as KEYMAP_3278_TYPEWRITER
+from .keymap_ibm_typewriter import KEYMAP as KEYMAP_IBM_TYPEWRITER
+from .keymap_ibm_enhanced import KEYMAP as KEYMAP_IBM_ENHANCED
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,19 +29,15 @@ logger = logging.getLogger('oec.main')
 
 CONTROLLER = None
 
-def _get_keymap(terminal_id, extended_id):
-    keymap = KEYMAP_3278_2
+def _get_keymap(keyboard_description):
+    if keyboard_description.startswith('3278'):
+        return KEYMAP_3278_TYPEWRITER
+    elif keyboard_description.startswith('IBM-TYPEWRITER'):
+        return KEYMAP_IBM_TYPEWRITER
+    elif keyboard_description.startswith('IBM-ENHANCED'):
+        return KEYMAP_IBM_ENHANCED
 
-    if extended_id == 'c1348300':
-        keymap = KEYMAP_3483
-
-    if extended_id == 'c1348301':
-        keymap = KEYMAP_3483_102
-
-    if extended_id == 'c1347200':
-        keymap = KEYMAP_3483
-
-    return keymap
+    return KEYMAP_3278_TYPEWRITER
 
 def _get_character_encoding(encoding):
     try:
@@ -55,10 +51,15 @@ def _create_device(args, interface, device_address, poll_response):
     # Read the terminal identifiers.
     (terminal_id, extended_id) = get_ids(interface, device_address)
 
-    logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
+    logger.info(f'Terminal ID = {terminal_id}')
+    logger.info(f'Extended ID = {extended_id}')
 
     if terminal_id.type != TerminalType.CUT:
         raise UnsupportedDeviceError('Only CUT type terminals are supported')
+
+    keyboard_description = get_keyboard_description(terminal_id, extended_id)
+
+    logger.info(f'Keyboard = {keyboard_description}')
 
     # Read the terminal features.
     features = get_features(interface, device_address)
@@ -66,7 +67,7 @@ def _create_device(args, interface, device_address, poll_response):
     logger.info(f'Features = {features}')
 
     # Get the keymap.
-    keymap = _get_keymap(terminal_id, extended_id)
+    keymap = _get_keymap(keyboard_description)
 
     logger.info(f'Keymap = {keymap.name}')
 
