@@ -52,10 +52,14 @@ def _create_device(args, interface, device_address, poll_response):
     (terminal_id, extended_id) = get_ids(interface, device_address)
 
     logger.info(f'Terminal ID = {terminal_id}')
-    logger.info(f'Extended ID = {extended_id}')
 
     if terminal_id.type != TerminalType.CUT:
         raise UnsupportedDeviceError('Only CUT type terminals are supported')
+
+    logger.info(f'Extended ID = {extended_id}')
+
+    if extended_id is not None:
+        logger.info(f'Model = IBM {extended_id[2:6]} or equivalent')
 
     keyboard_description = get_keyboard_description(terminal_id, extended_id)
 
