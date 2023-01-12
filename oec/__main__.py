@@ -1,10 +1,10 @@
+import sys
 import os
 import signal
-import codecs
 import logging
-import argparse
 from coax import open_serial_interface, TerminalType
 
+from .args import parse_args
 from .interface import InterfaceWrapper
 from .controller import Controller
 from .device import get_ids, get_features, get_keyboard_description, UnsupportedDeviceError
@@ -38,14 +38,6 @@ def _get_keymap(keyboard_description):
         return KEYMAP_IBM_ENHANCED
 
     return KEYMAP_3278_TYPEWRITER
-
-def _get_character_encoding(encoding):
-    try:
-        codecs.lookup(encoding)
-    except LookupError:
-        raise argparse.ArgumentTypeError(f'invalid encoding: {encoding}')
-
-    return encoding
 
 def _create_device(args, interface, device_address, poll_response):
     # Read the terminal identifiers.
@@ -91,38 +83,6 @@ def _create_session(args, device):
 
     raise ValueError('Unsupported emulator')
 
-def parse_tn3270_host_args(args, parser):
-    elements = args.host.rsplit(':', 1)
-
-    port = None
-
-    if len(elements) > 1:
-        try:
-            port = int(elements[1])
-        except ValueError:
-            parser.error(f'argument host: invalid port value: {elements[1]}')
-
-    if args.port is not None:
-        if port is None:
-            port = args.port
-
-            logger.info('The port argument is deprecated and will be removed in the future, use host:port instead.')
-        else:
-            logger.warning('The port argument is deprecated and will be removed in the future, port from host:port is being used.')
-
-    if port is None:
-        port = 23
-
-    elements = elements[0].split('@', 1)
-
-    host = elements[-1]
-    device_names = None
-
-    if len(elements) > 1:
-        device_names = elements[0].split(',')
-
-    return (host, port, device_names)
-
 def _signal_handler(number, frame):
     global CONTROLLER
 
@@ -139,35 +99,7 @@ signal.signal(signal.SIGTERM, _signal_handler)
 def main():
     global CONTROLLER
 
-    parser = argparse.ArgumentParser(description='IBM 3270 terminal controller')
-
-    parser.add_argument('serial_port', help='serial port')
-
-    subparsers = parser.add_subparsers(dest='emulator', required=True,
-                                       description='emulator')
-
-    tn3270_parser = subparsers.add_parser('tn3270', description='TN3270 emulator',
-                                          help='TN3270 emulator')
-
-    tn3270_parser.add_argument('host', metavar='[lu[,lu...]@]host[:port]',
-                               help='host and optional port and LUs')
-    tn3270_parser.add_argument('port', nargs='?', type=int, help=argparse.SUPPRESS)
-
-    tn3270_parser.add_argument('--codepage', metavar='encoding', default='ibm037',
-                               dest='character_encoding', type=_get_character_encoding)
-
-    if IS_VT100_AVAILABLE:
-        vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
-                                             help='VT100 emulator')
-
-        vt100_parser.add_argument('command', help='host process')
-        vt100_parser.add_argument('command_args', nargs=argparse.REMAINDER,
-                                  help='host process arguments')
-
-    args = parser.parse_args()
-
-    if args.emulator == 'tn3270':
-        (args.host, args.port, args.device_names) = parse_tn3270_host_args(args, parser)
+    args = parse_args(sys.argv[1:], IS_VT100_AVAILABLE)
 
     create_device = lambda interface, device_address, poll_response: _create_device(args, interface, device_address, poll_response)
     create_session = lambda device: _create_session(args, device)
