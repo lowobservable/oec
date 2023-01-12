@@ -27,19 +27,19 @@ logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger('oec.main')
 
-CONTROLLER = None
-
-def _get_keymap(keyboard_description):
+def _get_keymap(_args, keyboard_description):
     if keyboard_description.startswith('3278'):
         return KEYMAP_3278_TYPEWRITER
-    elif keyboard_description.startswith('IBM-TYPEWRITER'):
+
+    if keyboard_description.startswith('IBM-TYPEWRITER'):
         return KEYMAP_IBM_TYPEWRITER
-    elif keyboard_description.startswith('IBM-ENHANCED'):
+
+    if keyboard_description.startswith('IBM-ENHANCED'):
         return KEYMAP_IBM_ENHANCED
 
     return KEYMAP_3278_TYPEWRITER
 
-def _create_device(args, interface, device_address, poll_response):
+def _create_device(args, interface, device_address, _poll_response):
     # Read the terminal identifiers.
     (terminal_id, extended_id) = get_ids(interface, device_address)
 
@@ -63,7 +63,7 @@ def _create_device(args, interface, device_address, poll_response):
     logger.info(f'Features = {features}')
 
     # Get the keymap.
-    keymap = _get_keymap(keyboard_description)
+    keymap = _get_keymap(args, keyboard_description)
 
     logger.info(f'Keymap = {keymap.name}')
 
@@ -83,33 +83,29 @@ def _create_session(args, device):
 
     raise ValueError('Unsupported emulator')
 
-def _signal_handler(number, frame):
-    global CONTROLLER
-
-    logger.info('Stopping controller...')
-
-    if CONTROLLER:
-        CONTROLLER.stop()
-
-        CONTROLLER = None
-
-signal.signal(signal.SIGINT, _signal_handler)
-signal.signal(signal.SIGTERM, _signal_handler)
-
 def main():
-    global CONTROLLER
-
     args = parse_args(sys.argv[1:], IS_VT100_AVAILABLE)
 
-    create_device = lambda interface, device_address, poll_response: _create_device(args, interface, device_address, poll_response)
-    create_session = lambda device: _create_session(args, device)
+    def create_device(interface, device_address, poll_response):
+        return _create_device(args, interface, device_address, poll_response)
+
+    def create_session(device):
+        return _create_session(args, device)
 
     logger.info('Starting controller...')
 
     with open_serial_interface(args.serial_port) as interface:
-        CONTROLLER = Controller(InterfaceWrapper(interface), create_device, create_session)
+        controller = Controller(InterfaceWrapper(interface), create_device, create_session)
 
-        CONTROLLER.run()
+        def signal_handler(_number, _frame):
+            logger.info('Stopping controller...')
+
+            controller.stop()
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        controller.run()
 
 if __name__ == '__main__':
     main()
