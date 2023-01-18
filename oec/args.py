@@ -25,7 +25,13 @@ def parse_args(args, is_vt100_available):
     tn3270_parser.add_argument('port', nargs='?', type=int, help=argparse.SUPPRESS)
 
     tn3270_parser.add_argument('--codepage', metavar='encoding', default='ibm037',
-                               dest='character_encoding', type=get_character_encoding)
+                               dest='character_encoding', type=get_character_encoding,
+                               help='host EBCDIC code page')
+
+    tn3270_parser.add_argument('--tn3270e', choices=['off', 'basic', 'default'],
+                               metavar='profile', default='default',
+                               dest='tn3270e_profile',
+                               help='TN3270E profile: off, basic, default')
 
     if is_vt100_available:
         vt100_parser = subparsers.add_parser('vt100', description='VT100 emulator',
