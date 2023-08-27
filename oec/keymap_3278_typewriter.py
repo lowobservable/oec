@@ -93,7 +93,21 @@ KEYMAP_DEFAULT = {
     14: Key.UP,
     19: Key.DOWN,
     22: Key.LEFT,
-    26: Key.RIGHT
+    26: Key.RIGHT,
+
+    # PF keys on APL keyboard
+    64: Key.PF1,
+    65: Key.PF2,
+    66: Key.PF3,
+    67: Key.PF4,
+    68: Key.PF5,
+    69: Key.PF6,
+    70: Key.PF7,
+    71: Key.PF8,
+    72: Key.PF9,
+    73: Key.PF10,
+    74: Key.PF11,
+    75: Key.PF12
 }
 
 KEYMAP_SHIFT = {
@@ -153,7 +167,21 @@ KEYMAP_SHIFT = {
     108: Key.UPPER_M,
     51: Key.COMMA, # TODO: Confirm this mapping
     50: Key.CENTER_PERIOD,
-    20: Key.QUESTION
+    20: Key.QUESTION,
+
+    # PF keys on APL keyboard
+    64: Key.PF13,
+    65: Key.PF14,
+    66: Key.PF15,
+    67: Key.PF16,
+    68: Key.PF17,
+    69: Key.PF18,
+    70: Key.PF19,
+    71: Key.PF20,
+    72: Key.PF21,
+    73: Key.PF22,
+    74: Key.PF23,
+    75: Key.PF24
 }
 
 KEYMAP_ALT = {
