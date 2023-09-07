@@ -17,6 +17,35 @@ from .device import address_commands, format_address, UnsupportedDeviceError
 from .keyboard import Key
 from .session import SessionDisconnectedError
 
+class Timer:
+    def __init__(self, measurements):
+        self.measurements = measurements
+
+    def __enter__(self):
+        self.start_time = time.perf_counter()
+
+    def __exit__(self, type, value, traceback):
+        duration = time.perf_counter() - self.start_time
+
+        self.measurements.append(duration)
+
+PERF_LOGS = open('timing.csv', 'w')
+PERF_LOGS.write('update_sessions,delay,poll_attached,poll_detatched\n')
+
+def dump_stats(a, b, c, d):
+    if len(a) < 100:
+        return
+
+    for (l, m, n, o) in zip(a, b, c, d):
+        PERF_LOGS.write(f'{l},{m},{n},{o}\n')
+
+    PERF_LOGS.flush()
+
+    a.clear()
+    b.clear()
+    c.clear()
+    d.clear()
+
 class SessionState(Enum):
     """Session state."""
 
@@ -58,6 +87,11 @@ class Controller:
         self.last_attached_poll_time = None
         self.last_detatched_poll_time = None
 
+        self.a = []
+        self.b = []
+        self.c = []
+        self.d = []
+
     def run(self):
         """Run the controller."""
         self.running = True
@@ -98,17 +132,26 @@ class Controller:
         # If POLLing is delayed, handle the host output, otherwise just sleep.
         start_time = time.perf_counter()
 
-        if poll_delay > 0:
-            self._update_sessions(poll_delay)
+        with Timer(self.a):
+            if poll_delay > 0:
+                self._update_sessions(poll_delay)
 
         poll_delay -= (time.perf_counter() - start_time)
 
         if poll_delay > 0:
+            self.b.append(poll_delay)
             time.sleep(poll_delay)
+        else:
+            self.b.append(0)
 
         # POLL devices.
-        self._poll_attached_devices()
-        self._poll_next_detatched_device()
+        with Timer(self.c):
+            self._poll_attached_devices()
+
+        with Timer(self.d):
+            self._poll_next_detatched_device()
+
+        dump_stats(self.a, self.b, self.c, self.d)
 
     def _update_sessions(self, duration):
         start_time = time.perf_counter()
