@@ -79,6 +79,7 @@ def _create_session(args, device):
     if args.emulator == 'vt100' and IS_VT100_AVAILABLE:
         host_command = [args.command, *args.command_args]
 
+        # pylint: disable-next=possibly-used-before-assignment
         return VT100Session(device, host_command)
 
     raise ValueError('Unsupported emulator')
