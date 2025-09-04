@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from coax import ReadAddressCounterHi, ReadAddressCounterLo, ProtocolError
+from coax import ReadAddressCounterHi, ReadAddressCounterLo, ProtocolError, ReceiveTimeout, ReceiveError
 
 import context
 
@@ -105,3 +105,24 @@ class InterfaceWrapperExecuteTestCase(unittest.TestCase):
         self.assertIsInstance(error.errors[0], ProtocolError)
 
         self.assertEqual(len(error.responses), 2)
+
+class ExecuteErrorTestCase(unittest.TestCase):
+    def test_single_str_error(self):
+        error = ExecuteError([ReceiveError('ReceiveErrorMessage')], [])
+
+        self.assertEqual(str(error), 'ReceiveErrorMessage')
+
+    def test_single_repr_error(self):
+        error = ExecuteError([ReceiveTimeout()], [])
+
+        self.assertEqual(str(error), 'ReceiveTimeout()')
+
+    def test_multiple_errors_first_str_error(self):
+        error = ExecuteError([ReceiveError('ReceiveErrorMessage'), ReceiveTimeout()], [])
+
+        self.assertEqual(str(error), 'ReceiveErrorMessage and 1 other error')
+
+    def test_multiple_errors_first_repr_error(self):
+        error = ExecuteError([ReceiveTimeout(), ReceiveError('ReceiveErrorMessage')], [])
+
+        self.assertEqual(str(error), 'ReceiveTimeout() and 1 other error')

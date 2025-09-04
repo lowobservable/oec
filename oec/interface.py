@@ -13,10 +13,15 @@ logger = logging.getLogger(__name__)
 
 class ExecuteError(Exception):
     def __init__(self, errors, responses):
-        if len(errors) == 1:
-            message = str(errors[0])
-        else:
-            message = f'{len(errors)} occurred'
+        if not errors:
+            raise ValueError('Errors required')
+
+        message = str(errors[0]) or repr(errors[0])
+
+        if len(errors) == 2:
+            message += ' and 1 other error'
+        elif len(errors) > 2:
+            message += f' and {len(errors) - 1} other errors'
 
         super().__init__(message)
 
