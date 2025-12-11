@@ -2,13 +2,13 @@ import sys
 import os
 import signal
 import logging
-from coax import open_serial_interface, TerminalType
+from coax import open_serial_interface, TerminalType, Feature
 
 from .args import parse_args
 from .interface import InterfaceWrapper
 from .controller import Controller
-from .device import get_ids, get_features, get_keyboard_description, UnsupportedDeviceError
-from .terminal import Terminal
+from .device import get_ids, get_features, UnsupportedDeviceError
+from .terminal import Terminal, get_model, get_keyboard_description
 from .tn3270 import TN3270Session
 
 # VT100 emulation is not supported on Windows.
@@ -40,34 +40,35 @@ def _get_keymap(_args, keyboard_description):
     return KEYMAP_3278_TYPEWRITER
 
 def _create_device(args, interface, device_address, _poll_response):
-    # Read the terminal identifiers.
     (terminal_id, extended_id) = get_ids(interface, device_address)
 
-    logger.info(f'Terminal ID = {terminal_id}')
+    logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
 
     if terminal_id.type != TerminalType.CUT:
         raise UnsupportedDeviceError('Only CUT type terminals are supported')
 
-    logger.info(f'Extended ID = {extended_id}')
+    model = get_model(terminal_id, extended_id)
 
-    if extended_id is not None:
-        logger.info(f'Model = IBM {extended_id[2:6]} or equivalent')
+    if model is not None:
+        logger.info(f'Model = IBM {model} or equivalent')
+
+    features = get_features(interface, device_address)
+
+    # The 3179 includes an EAB but does not respond to the READ_FEATURE_ID
+    # command.
+    if model == '3179':
+        features[Feature.EAB] = 7
+
+    logger.info(f'Features = {features}')
 
     keyboard_description = get_keyboard_description(terminal_id, extended_id)
 
     logger.info(f'Keyboard = {keyboard_description}')
 
-    # Read the terminal features.
-    features = get_features(interface, device_address)
-
-    logger.info(f'Features = {features}')
-
-    # Get the keymap.
     keymap = _get_keymap(args, keyboard_description)
 
     logger.info(f'Keymap = {keymap.name}')
 
-    # Create the terminal.
     terminal = Terminal(interface, device_address, terminal_id, extended_id, features, keymap)
 
     return terminal

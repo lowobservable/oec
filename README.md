@@ -33,6 +33,7 @@ emulation.
 
 Only CUT (Control Unit Terminal) type terminals are supported. I have tested oec with the following terminals:
 
+  * IBM 3179
   * IBM 3278-2
   * IBM 3472
   * IBM 3483-V (InfoWindow II)
