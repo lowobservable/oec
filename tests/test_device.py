@@ -8,7 +8,7 @@ from coax.protocol import TerminalId
 import context
 
 from oec.interface import InterfaceWrapper
-from oec.device import address_commands, format_address, get_ids, get_features, get_keyboard_description, _jumbo_write_split_data
+from oec.device import address_commands, format_address, get_ids, get_features, _jumbo_write_split_data
 
 from mock_interface import MockInterface
 
@@ -160,27 +160,6 @@ class GetFeaturesTestCase(unittest.TestCase):
 
         # Assert
         self.assertEqual(features, { Feature.EAB: 7 })
-
-class GetKeyboardDescriptionTestCase(unittest.TestCase):
-    def test(self):
-        CASES = [
-            (10, None, '3278-TYPEWRITER'),
-            (0, 'c1347200', 'IBM-TYPEWRITER'),
-            (10, '41347200', '3278-TYPEWRITER'),
-            (0, 'c2347200', 'IBM-DATAENTRY'),
-            (0, 'c3347200', 'IBM-APL'),
-            (0, 'c1348301', 'IBM-ENHANCED'),
-            (0, 'e1347200', 'USER-1'),
-            (0, 'e4347200', 'USER-4')
-        ]
-
-        for (keyboard, extended_id, expected_description) in CASES:
-            with self.subTest(keyboard=keyboard, extended_id=extended_id):
-                terminal_id = TerminalId(0b0000_0100 | (keyboard << 4))
-
-                description = get_keyboard_description(terminal_id, extended_id)
-
-                self.assertEqual(description, expected_description)
 
 class JumboWriteSplitDataTestCase(unittest.TestCase):
     def test_no_split_strategy(self):

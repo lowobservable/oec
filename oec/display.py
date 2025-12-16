@@ -175,12 +175,18 @@ class Display:
         return True
 
     def _write_data(self, data):
-        self.terminal.execute_jumbo_write(data, WriteData, Data, -1)
+        self.terminal.execute(self.terminal.prepare_jumbo_write(data, WriteData, Data, -1))
 
     def _eab_write_alternate(self, data):
+        # The EAB mask on a 3179 terminal appears to get reset regularly resulting
+        # in the EAB buffer not being updated correctly. This does not affect
+        # later terminals, loading the mask here for all terminals is simpler.
+        #
         # The EAB_WRITE_ALTERNATE command data must be split so that the two bytes
         # do not get separated, otherwise the write will be incorrect.
-        self.terminal.execute_jumbo_write(data, lambda chunk: EABWriteAlternate(self.eab_address, chunk), Data, -2)
+        commands = [EABLoadMask(self.eab_address, 0xff), *self.terminal.prepare_jumbo_write(data, lambda chunk: EABWriteAlternate(self.eab_address, chunk), Data, -2)]
+
+        self.terminal.execute(commands)
 
 def _split_address(address):
     if address is None:
