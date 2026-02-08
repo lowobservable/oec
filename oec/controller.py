@@ -30,6 +30,8 @@ class Controller:
     def __init__(self, interface, create_device, create_session):
         self.logger = logging.getLogger(__name__)
 
+        self.logger.setLevel(logging.DEBUG)
+
         self.interface = interface
         self.running = False
 

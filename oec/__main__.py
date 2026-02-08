@@ -42,6 +42,8 @@ def _get_keymap(_args, keyboard_description):
 def _create_device(args, interface, device_address, _poll_response):
     (terminal_id, extended_id) = get_ids(interface, device_address)
 
+    print('*** TERMINAL ID = ' + '{0:02X}'.format(terminal_id.value))
+
     logger.info(f'Terminal ID = {terminal_id}, Extended ID = {extended_id}')
 
     if terminal_id.type != TerminalType.CUT:
