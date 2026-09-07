@@ -4,6 +4,7 @@ oec.tn3270
 """
 
 import logging
+import ssl
 from tn3270 import Telnet, TN3270EFunction, Emulator, AttributeCell, CharacterCell, AID, Color, \
                    Highlight, OperatorError, ProtectedCellOperatorError, FieldOverflowOperatorError
 from tn3270.ebcdic import DUP, FM
@@ -47,7 +48,7 @@ AID_KEY_MAP = {
 class TN3270Session(Session):
     """TN3270 session."""
 
-    def __init__(self, terminal, host, port, device_names, character_encoding, tn3270e_profile):
+    def __init__(self, terminal, host, port, device_names, character_encoding, tn3270e_profile, ssl_enabled=False, no_starttls=False, ssl_no_verify=False, no_hostname_status=False):
         super().__init__(terminal)
 
         self.logger = logging.getLogger(__name__)
@@ -57,6 +58,10 @@ class TN3270Session(Session):
         self.device_names = device_names
         self.character_encoding = character_encoding
         self.tn3270e_profile = tn3270e_profile
+        self.ssl_enabled = ssl_enabled
+        self.no_starttls = no_starttls
+        self.ssl_no_verify = ssl_no_verify
+        self.no_hostname_status = no_hostname_status
 
         self.telnet = None
         self.emulator = None
@@ -71,6 +76,11 @@ class TN3270Session(Session):
 
     def start(self):
         self._connect_host()
+
+        self._write_security_status()
+
+        if not self.no_hostname_status:
+            self._write_hostname_status()
 
         (rows, columns) = self.terminal.display.dimensions
 
@@ -93,6 +103,10 @@ class TN3270Session(Session):
 
     def fileno(self):
         return self.emulator.stream.socket.fileno()
+
+    def has_pending_data(self):
+        sock = self.emulator.stream.socket
+        return isinstance(sock, ssl.SSLSocket) and sock.pending() > 0
 
     def handle_host(self):
         try:
@@ -196,12 +210,48 @@ class TN3270Session(Session):
 
         self.telnet = Telnet(terminal_type, **tn3270e_args)
 
-        self.telnet.open(self.host, self.port, self.device_names)
+        ssl_args = {}
+        starttls_enabled = not self.ssl_enabled and not self.no_starttls
+
+        if self.ssl_enabled or starttls_enabled:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+
+            if self.ssl_no_verify:
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+            else:
+                ssl_context.load_default_certs()
+
+            if self.ssl_enabled:
+                ssl_args['ssl_context'] = ssl_context
+                ssl_args['ssl_server_hostname'] = self.host
+            else:
+                ssl_args['starttls_ssl_context'] = ssl_context
+                ssl_args['starttls_server_hostname'] = self.host
+
+        self.telnet.open(self.host, self.port, self.device_names, **ssl_args)
 
         if self.telnet.is_tn3270e_negotiated:
             self.logger.info(f'TN3270E mode negotiated: Device Type = {self.telnet.device_type}, Device Name = {self.telnet.device_name}, Functions = {self.telnet.tn3270e_functions}')
         else:
             self.logger.debug('Unable to negotiate TN3270E mode')
+
+    def _write_security_status(self):
+        is_secure = isinstance(self.telnet.socket, ssl.SSLSocket)
+
+        self.terminal.display.status_line.write_string(20, 'encrypted' if is_secure else 'unencrypted')
+
+    def _write_hostname_status(self):
+        status_column = 46
+        columns = self.terminal.display.status_line.columns
+        max_length = columns - status_column
+
+        if self.port == 23:
+            text = self.host
+        else:
+            text = f'{self.host}:{self.port}'
+
+        self.terminal.display.status_line.write_string(status_column, text[:max_length].rjust(max_length))
 
     def _disconnect_host(self):
         self.telnet.close()

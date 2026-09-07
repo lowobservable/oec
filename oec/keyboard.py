@@ -228,6 +228,17 @@ class Key(Enum):
     SLASH = ord('/')
     QUESTION = ord('?')
 
+    # German
+    ESZETT = ord('ß')
+    SECTION = ord('§')
+    CARET = ord('^')
+    LOWER_A_UMLAUT = ord('ä')
+    UPPER_A_UMLAUT = ord('Ä')
+    LOWER_O_UMLAUT = ord('ö')
+    UPPER_O_UMLAUT = ord('Ö')
+    LOWER_U_UMLAUT = ord('ü')
+    UPPER_U_UMLAUT = ord('Ü')
+
 KEY_UPPER_MAP = {
     Key.LOWER_A: Key.UPPER_A,
     Key.LOWER_B: Key.UPPER_B,
@@ -254,7 +265,10 @@ KEY_UPPER_MAP = {
     Key.LOWER_W: Key.UPPER_W,
     Key.LOWER_X: Key.UPPER_X,
     Key.LOWER_Y: Key.UPPER_Y,
-    Key.LOWER_Z: Key.UPPER_Z
+    Key.LOWER_Z: Key.UPPER_Z,
+    Key.LOWER_A_UMLAUT: Key.UPPER_A_UMLAUT,
+    Key.LOWER_O_UMLAUT: Key.UPPER_O_UMLAUT,
+    Key.LOWER_U_UMLAUT: Key.UPPER_U_UMLAUT
 }
 
 KEY_LOWER_MAP = {upper_key: lower_key for lower_key, upper_key in KEY_UPPER_MAP.items()}

@@ -36,14 +36,17 @@ class Device:
 
     def prepare_jumbo_write(self, data, create_first, create_subsequent, first_chunk_max_length_adjustment=-1):
         """Prepare a jumbo write command that can be split."""
-        max_length = None
+        # Split large writes at 1024 bytes by default. The 3299 multiplexer has a frame
+        # length limit around this size, and some terminals (e.g. IBM 3192, IRMA) cannot
+        # buffer a full-screen EAB write delivered in a single command - they either
+        # reject it with a protocol error or silently truncate. Real 3278-2 terminals
+        # happen to accept the full write, but there is no downside to splitting for them.
+        max_length = 1024
 
-        # The 3299 multiplexer appears to have some frame length limit, after which it will
-        # stop transmitting. I've not determined the actual limit, but 1024 appears to work.
-        if self.device_address is not None:
-            max_length = 1024
-        elif self.interface.jumbo_write_strategy == 'split':
+        if self.interface.jumbo_write_strategy == 'split':
             max_length = self.interface.jumbo_write_max_length
+        elif self.interface.jumbo_write_strategy == 'ignore':
+            max_length = None
 
         chunks = _jumbo_write_split_data(data, max_length, first_chunk_max_length_adjustment)
 

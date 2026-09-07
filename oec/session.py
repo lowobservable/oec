@@ -11,6 +11,9 @@ class Session:
     def fileno(self):
         raise NotImplementedError
 
+    def has_pending_data(self):
+        return False
+
     def handle_host(self):
         raise NotImplementedError
 

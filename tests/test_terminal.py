@@ -39,6 +39,7 @@ class TerminalSetupTestCase(unittest.TestCase):
 
         self.terminal.display = create_autospec(Display, instance=True)
         self.terminal.display.status_line = create_autospec(StatusLine, instance=True)
+        self.terminal.display.status_line.columns = 80
 
     def test(self):
         self.terminal.setup()

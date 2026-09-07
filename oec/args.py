@@ -14,6 +14,17 @@ def parse_args(args, is_vt100_available):
 
     parser.add_argument('serial_port', help='serial port')
 
+    parser.add_argument('--log-level', choices=['debug', 'info', 'warning', 'error'],
+                         default='info', dest='log_level',
+                         help='logging level (default: info)')
+
+    parser.add_argument('--keyboard-language', choices=['us', 'de'], default='us',
+                         dest='keyboard_language',
+                         help='keyboard national layout (default: us)')
+
+    parser.add_argument('--clicker', action='store_true', default=False,
+                         help='enable keyboard clicker')
+
     subparsers = parser.add_subparsers(dest='emulator', required=True,
                                        description='emulator')
 
@@ -27,6 +38,21 @@ def parse_args(args, is_vt100_available):
     tn3270_parser.add_argument('--codepage', metavar='encoding', default='ibm037',
                                dest='character_encoding', type=get_character_encoding,
                                help='host EBCDIC code page')
+
+    tn3270_parser.add_argument('--ssl', action='store_true', default=False,
+                               help='enable implicit SSL/TLS')
+
+    tn3270_parser.add_argument('--no-starttls', action='store_true', default=False,
+                               dest='no_starttls',
+                               help='disable STARTTLS negotiation')
+
+    tn3270_parser.add_argument('--ssl-no-verify', action='store_true', default=False,
+                               dest='ssl_no_verify',
+                               help='disable SSL/TLS certificate verification')
+
+    tn3270_parser.add_argument('--no-hostname-status', action='store_true', default=False,
+                               dest='no_hostname_status',
+                               help='do not display host name on status line')
 
     tn3270_parser.add_argument('--tn3270e', choices=['off', 'basic', 'default'],
                                metavar='profile', default='default',

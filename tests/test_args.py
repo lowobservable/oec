@@ -85,3 +85,28 @@ class ParseArgsTestCase(unittest.TestCase):
                 self.parser_error.assert_called_once()
 
                 self.assertEqual(self.parser_error.call_args.args[0], f'argument port: invalid port: {port}')
+
+    def test_tn3270_ssl_default(self):
+        args = parse_args(['/dev/ttyACM0', 'tn3270', 'host'], False)
+
+        self.assertFalse(args.ssl)
+        self.assertFalse(args.no_starttls)
+        self.assertFalse(args.ssl_no_verify)
+
+    def test_tn3270_ssl(self):
+        args = parse_args(['/dev/ttyACM0', 'tn3270', '--ssl', 'host:992'], False)
+
+        self.assertTrue(args.ssl)
+        self.assertFalse(args.ssl_no_verify)
+
+    def test_tn3270_ssl_no_verify(self):
+        args = parse_args(['/dev/ttyACM0', 'tn3270', '--ssl', '--ssl-no-verify', 'host:992'], False)
+
+        self.assertTrue(args.ssl)
+        self.assertTrue(args.ssl_no_verify)
+
+    def test_tn3270_no_starttls(self):
+        args = parse_args(['/dev/ttyACM0', 'tn3270', '--no-starttls', 'host:23'], False)
+
+        self.assertFalse(args.ssl)
+        self.assertTrue(args.no_starttls)

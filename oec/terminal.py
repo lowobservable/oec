@@ -3,10 +3,14 @@ oec.terminal
 ~~~~~~~~~~~~
 """
 
+import logging
+
 from coax import LoadControlRegister, Feature, PollAction, Control
 
 from .device import Device, UnsupportedDeviceError
 from .display import Dimensions, BufferedDisplay
+
+logger = logging.getLogger(__name__)
 from .keyboard import Keyboard
 
 MODEL_DIMENSIONS = {
@@ -50,8 +54,9 @@ class Terminal(Device):
 
         self.display.clear(clear_status_line=True)
 
-        # Show the attached indicator on the status line.
-        self.display.status_line.write_string(0, 'OEC')
+        # Show the attached indicator on the status line, padded to full width.
+        columns = self.display.status_line.columns
+        self.display.status_line.write_string(0, 'OEC'.ljust(columns))
 
         self.display.move_cursor(row=0, column=0)
 
@@ -62,6 +67,7 @@ class Terminal(Device):
         # Convert a queued alarm or keyboard clicker change to POLL action.
         if self.alarm:
             poll_action = PollAction.ALARM
+            logger.debug('Alarm delivered via POLL')
 
             self.alarm = False
         elif self.keyboard.clicker != self.last_poll_keyboard_clicker:
@@ -76,6 +82,7 @@ class Terminal(Device):
 
     def sound_alarm(self):
         """Queue an alarm on next POLL command."""
+        logger.debug('Alarm queued')
         self.alarm = True
 
     def load_control_register(self):

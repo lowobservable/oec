@@ -313,8 +313,13 @@ class BufferedDisplay(Display):
         try:
             self.write(regen_data, eab_data, address=start_address)
         except Exception as error:
-            # TODO: This could leave the address_counter incorrect.
             self.logger.error(f'Write error: {error}', exc_info=error)
+
+            # After a failed write the terminal's address counter may not match
+            # what we cached, so force a fresh LOAD_ADDRESS_COUNTER on the next
+            # write. The regen/EAB buffer and the dirty set are untouched since
+            # _commit() did not run, so the next flush will retry this range.
+            self.address_counter = None
 
     def _get_dirty_ranges(self):
         if not self.dirty:
@@ -324,6 +329,14 @@ class BufferedDisplay(Display):
         return [(self.dirty[0], self.dirty[-1])]
 
 CHAR_MAP = {
+    # GE/APL plane (0x40-0x7F) - multinational accented characters
+    'ä': 0x50,
+    'ö': 0x53,
+    'ü': 0x54,
+    'Ä': 0x70,
+    'Ö': 0x73,
+    'Ü': 0x74,
+
     '>': 0x08,
     '<': 0x09,
     '[': 0x0a,

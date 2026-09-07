@@ -188,6 +188,13 @@ class Controller:
         if not self.session_selector.get_map():
             return []
 
+        # Check for sessions with SSL pending data first - select() won't
+        # report these as readable since the data is buffered in the SSL layer.
+        pending_sessions = [key.fileobj for key in self.session_selector.get_map().values() if key.fileobj.has_pending_data()]
+
+        if pending_sessions:
+            return pending_sessions
+
         selected = self.session_selector.select(duration)
 
         return [key.fileobj for (key, _) in selected]
